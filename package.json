@@ -1,5 +1,5 @@
 {
-  "name": "fanscosa-admin-panel",
+  "name": "dailyreport-admin-panel",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,19 +9,35 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-toast": "^1.2.14",
+    "@tremor/react": "^3.18.7",
+    "axios": "^1.9.0",
+    "classnames": "^2.5.1",
+    "clsx": "^2.1.1",
+    "js-cookie": "^3.0.5",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.511.0",
+    "next": "15.3.3",
     "react": "^19.0.0",
+    "react-calendar": "^6.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.3.3"
+    "react-leaflet": "^5.0.0",
+    "recharts": "^2.15.3"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/js-cookie": "^3.0.6",
+    "@types/leaflet": "^1.9.18",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

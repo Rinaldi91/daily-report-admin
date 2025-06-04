@@ -1,0 +1,299 @@
+'use client';
+
+import { useState, useEffect, JSX } from 'react';
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
+import { Eye, EyeOff, LogIn, Mail, Lock, Building2 } from 'lucide-react';
+
+interface LoginResponse {
+  token: string;
+  data: {
+    role: {
+      slug: string;
+      permissions: Array<{ slug: string }>;
+    };
+  };
+}
+
+export default function LoginForm(): JSX.Element {
+  const router = useRouter();
+
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [remember, setRemember] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Ambil email & password dari cookie jika remember me aktif
+  useEffect(() => {
+    const savedEmail = Cookies.get('remember_email');
+    const savedPassword = Cookies.get('remember_password');
+    if (savedEmail && savedPassword) {
+      setEmail(savedEmail);
+      setPassword(savedPassword);
+      setRemember(true);
+    }
+  }, []);
+
+  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLInputElement>): Promise<void> => {
+    if (e) e.preventDefault();
+    
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const res = await axios.post<LoginResponse>('http://report-api.test/api/login', {
+        email,
+        password,
+      });
+
+      const { token, data } = res.data;
+      const cookieOptions = remember ? { expires: 7 } : { expires: 1 };
+
+      // Simpan cookie login
+      Cookies.set('token', token, cookieOptions);
+      Cookies.set('role', data.role.slug, cookieOptions);
+      Cookies.set('user', JSON.stringify(data), cookieOptions);
+
+      const permissionSlugs = data.role.permissions.map((p: { slug: string }) => p.slug);
+      Cookies.set('permissions', JSON.stringify(permissionSlugs), cookieOptions);
+
+      // Simpan email & password jika remember me dicentang
+      if (remember) {
+        Cookies.set('remember_email', email, { expires: 7 });
+        Cookies.set('remember_password', password, { expires: 7 });
+      } else {
+        Cookies.remove('remember_email');
+        Cookies.remove('remember_password');
+      }
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Login gagal. Periksa email dan password.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
+    }
+  };
+
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    handleSubmit(e);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    handleSubmit(e);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4 w-full">
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full flex min-h-[600px]">
+        
+        {/* Left Card - Logo & Company Info */}
+        <div className="bg-gradient-to-br from-red-600 to-red-700 text-white p-12 flex flex-col justify-center items-center w-1/2 relative overflow-hidden">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full"></div>
+            <div className="absolute bottom-10 right-10 w-20 h-20 bg-white rounded-full"></div>
+            <div className="absolute top-1/2 right-20 w-16 h-16 bg-white rounded-full"></div>
+            <div className="absolute top-20 right-32 w-12 h-12 bg-white rounded-full"></div>
+            <div className="absolute bottom-32 left-20 w-8 h-8 bg-white rounded-full"></div>
+          </div>
+          
+          {/* Logo Section */}
+          <div className="text-center z-10 relative">
+            <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
+              <Building2 className="w-12 h-12 text-white" />
+            </div>
+            
+            <h1 className="text-4xl font-bold mb-4">PT. ARBI</h1>
+            <p className="text-red-100 text-lg mb-8 leading-relaxed max-w-xs">
+              Sistem Pelaporan Terintegrasi untuk Manajemen Data yang Efisien
+            </p>
+            
+            <div className="space-y-4 text-red-100">
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                <span className="text-sm">Akses Aman & Terpercaya</span>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                <span className="text-sm">Dashboard Komprehensif</span>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                <span className="text-sm">Laporan Real-time</span>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-red-300 rounded-full"></div>
+                <span className="text-sm">Multi-User Management</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Card - Login Form */}
+        <div className="w-1/2 p-12 flex flex-col justify-center bg-gray-50">
+          <div className="max-w-sm mx-auto w-full">
+            
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">Selamat Datang</h2>
+              <p className="text-gray-600">Silakan masuk ke akun Anda</p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleFormSubmit} className="space-y-6">
+              
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-500 rounded-full flex-shrink-0"></div>
+                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                </div>
+              )}
+
+              {/* Email Field */}
+              <div className="space-y-2">
+                <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
+                  Alamat Email
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    placeholder="nama@perusahaan.com"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 text-gray-900 placeholder-gray-500 bg-white"
+                    required
+                    disabled={isLoading}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
+                  Kata Sandi
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    placeholder="••••••••••"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 text-gray-900 placeholder-gray-500 bg-white"
+                    required
+                    disabled={isLoading}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-100 rounded-r-lg transition-colors duration-200"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember Me & Forgot Password */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember"
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemember(e.target.checked)}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded transition-colors duration-200"
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="remember" className="ml-2 text-sm text-gray-700 font-medium">
+                    Ingat saya
+                  </label>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200 font-medium hover:underline"
+                    disabled={isLoading}
+                  >
+                    Lupa kata sandi?
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading || !email || !password}
+                className={`w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-white font-semibold transition-all duration-200 cursor-pointer ${
+                  isLoading || !email || !password
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700 hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sedang Masuk...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    Login
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-8 text-center">
+              <p className="text-sm text-gray-600">
+                Belum punya akun?{' '}
+                <button
+                  type="button"
+                  className="text-red-600 hover:text-red-700 font-semibold transition-colors duration-200 hover:underline"
+                  disabled={isLoading}
+                >
+                  Hubungi Administrator
+                </button>
+              </p>
+            </div>
+
+            {/* Version Info */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-400">
+                v1.0.0 | © 2025 PT. Anugerah Rezeki Bersama Indonesia
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
