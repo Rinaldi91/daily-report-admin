@@ -37,8 +37,8 @@ export default function LoginForm(): JSX.Element {
     }
   }, []);
 
-  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLInputElement>): Promise<void> => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
     
     setIsLoading(true);
     setError('');
@@ -80,16 +80,9 @@ export default function LoginForm(): JSX.Element {
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
-      handleSubmit(e);
+      // Form akan otomatis submit karena button type="submit"
+      // Tidak perlu manual submit di sini
     }
-  };
-
-  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
-    handleSubmit(e);
-  };
-
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
-    handleSubmit(e);
   };
 
   return (
@@ -110,10 +103,10 @@ export default function LoginForm(): JSX.Element {
           {/* Logo Section */}
           <div className="text-center z-10 relative">
             <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
-              <Building2 className="w-12 h-12 text-white" />
+              <Building2 className="w-12 h-12 text-black" />
             </div>
             
-            <h1 className="text-4xl font-bold mb-4">PT. ARBI</h1>
+            <h1 className="text-2xl font-bold mb-4">PT. Anugerah Rezeki Bersama Indonesia</h1>
             <p className="text-red-100 text-lg mb-8 leading-relaxed max-w-xs">
               Sistem Pelaporan Terintegrasi untuk Manajemen Data yang Efisien
             </p>
@@ -150,7 +143,7 @@ export default function LoginForm(): JSX.Element {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleFormSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               
               {/* Error Message */}
               {error && (
