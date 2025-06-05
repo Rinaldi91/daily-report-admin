@@ -94,7 +94,7 @@ export const hasPermission = (permissionSlug: string) => {
   }
   
   return userData.role.permissions.some(
-    (permission: any) => permission.slug === permissionSlug
+    (permission: { slug: string }) => permission.slug === permissionSlug
   );
 };
 
@@ -105,5 +105,5 @@ export const getUserPermissions = () => {
     return [];
   }
   
-  return userData.role.permissions.map((permission: any) => permission.slug);
+  return userData.role.permissions.map((permission: { slug: string }) => permission.slug);
 };

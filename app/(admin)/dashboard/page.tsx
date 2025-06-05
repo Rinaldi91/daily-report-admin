@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 import {
   BarChart,
   Bar,
@@ -16,6 +16,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { LayoutDashboard } from "lucide-react";
 
 const chartData = [
   { name: "Jan", Sales: 1200 },
@@ -73,12 +74,16 @@ type ApiResponse = {
 };
 
 // Utility function to get data from cookies
-const getUserDataFromCookies = (): { user: User | null; token: string | null; permissions: string[] } => {
+const getUserDataFromCookies = (): {
+  user: User | null;
+  token: string | null;
+  permissions: string[];
+} => {
   try {
-    const token = Cookies.get('token') || null; // Convert undefined to null
-    const userCookie = Cookies.get('user');
-    const permissionsCookie = Cookies.get('permissions');
-    
+    const token = Cookies.get("token") || null; // Convert undefined to null
+    const userCookie = Cookies.get("user");
+    const permissionsCookie = Cookies.get("permissions");
+
     let user: User | null = null;
     let permissions: string[] = [];
 
@@ -92,7 +97,7 @@ const getUserDataFromCookies = (): { user: User | null; token: string | null; pe
 
     return { user, token, permissions };
   } catch (error) {
-    console.error('Error parsing cookie data:', error);
+    console.error("Error parsing cookie data:", error);
     return { user: null, token: null, permissions: [] };
   }
 };
@@ -102,7 +107,7 @@ const fetchUserProfile = async (token: string): Promise<User | null> => {
   try {
     console.log("🚀 Fetching fresh user data from API");
 
-    const response = await fetch('http://report-api.test/api/profile', {
+    const response = await fetch("http://report-api.test/api/profile", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -137,7 +142,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<'cookie' | 'api' | 'fallback'>('cookie');
+  const [dataSource, setDataSource] = useState<"cookie" | "api" | "fallback">(
+    "cookie"
+  );
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -146,18 +153,22 @@ export default function DashboardPage() {
         setError(null);
 
         // 1. First, try to get data from cookies (faster)
-        const { user: cookieUser, token, permissions } = getUserDataFromCookies();
-        
-        console.log("🍪 Cookie data:", { 
-          hasUser: !!cookieUser, 
-          hasToken: !!token, 
-          permissionsCount: permissions.length 
+        const {
+          user: cookieUser,
+          token,
+          permissions,
+        } = getUserDataFromCookies();
+
+        console.log("🍪 Cookie data:", {
+          hasUser: !!cookieUser,
+          hasToken: !!token,
+          permissionsCount: permissions.length,
         });
 
         if (cookieUser && token) {
           // Set cookie data immediately for fast loading
           setUser(cookieUser);
-          setDataSource('cookie');
+          setDataSource("cookie");
           setLoading(false);
 
           // 2. Then try to fetch fresh data from API (background update)
@@ -166,56 +177,64 @@ export default function DashboardPage() {
             if (freshUser) {
               console.log("🔄 Updating with fresh API data");
               setUser(freshUser);
-              setDataSource('api');
-              
+              setDataSource("api");
+
               // Update cookies with fresh data
-              Cookies.set('user', JSON.stringify(freshUser), { expires: 1 });
-              
+              Cookies.set("user", JSON.stringify(freshUser), { expires: 1 });
+
               // Update permissions if available
               if (freshUser.role?.permissions) {
-                const permissionSlugs = freshUser.role.permissions.map(p => p.slug);
-                Cookies.set('permissions', JSON.stringify(permissionSlugs), { expires: 1 });
+                const permissionSlugs = freshUser.role.permissions.map(
+                  (p) => p.slug
+                );
+                Cookies.set("permissions", JSON.stringify(permissionSlugs), {
+                  expires: 1,
+                });
               }
             }
           } catch (apiError) {
-            console.warn("⚠️ Failed to fetch fresh data, using cookie data:", apiError);
+            console.warn(
+              "⚠️ Failed to fetch fresh data, using cookie data:",
+              apiError
+            );
             setError("Using cached data. Could not fetch latest updates.");
           }
-        } 
-        else if (token) {
+        } else if (token) {
           // 3. If no user in cookie but token exists, fetch from API
           console.log("🔍 No user in cookies, fetching from API...");
           const apiUser = await fetchUserProfile(token);
-          
+
           if (apiUser) {
             setUser(apiUser);
-            setDataSource('api');
-            
+            setDataSource("api");
+
             // Save to cookies for next time
-            Cookies.set('user', JSON.stringify(apiUser), { expires: 1 });
+            Cookies.set("user", JSON.stringify(apiUser), { expires: 1 });
             if (apiUser.role?.permissions) {
-              const permissionSlugs = apiUser.role.permissions.map(p => p.slug);
-              Cookies.set('permissions', JSON.stringify(permissionSlugs), { expires: 1 });
+              const permissionSlugs = apiUser.role.permissions.map(
+                (p) => p.slug
+              );
+              Cookies.set("permissions", JSON.stringify(permissionSlugs), {
+                expires: 1,
+              });
             }
           } else {
             throw new Error("Failed to fetch user data from API");
           }
-        }
-        else {
+        } else {
           // 4. No token found, user needs to login
           console.warn("❌ No authentication token found");
           setError("Please login to access dashboard");
-          setDataSource('fallback');
-          
+          setDataSource("fallback");
+
           // Redirect to login or show login prompt
           // window.location.href = '/login';
         }
-
       } catch (err) {
         console.error("Failed to load user data:", err);
         setError("Failed to load user data. Please try refreshing the page.");
-        setDataSource('fallback');
-        
+        setDataSource("fallback");
+
         // Fallback user for development
         setUser({
           id: 0,
@@ -250,7 +269,9 @@ export default function DashboardPage() {
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-white text-lg">Loading dashboard...</div>
-          <div className="text-white/60 text-sm mt-2">Fetching user data...</div>
+          <div className="text-white/60 text-sm mt-2">
+            Fetching user data...
+          </div>
         </div>
       </div>
     );
@@ -262,7 +283,11 @@ export default function DashboardPage() {
       {error && (
         <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-lg mb-4">
           <div className="flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path
                 fillRule="evenodd"
                 d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -277,9 +302,13 @@ export default function DashboardPage() {
       {/* Data source indicator */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-white/80 mt-1">
-            Selamat datang, {user?.name || "User"}!
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <LayoutDashboard className="w-6 h-6" />
+            Dashboard
+          </h1>
+          <p className="text-white/80 mt-1 flex items-center gap-2">
+            <span className="text-lg">👋</span>
+            Welcome Back, {user?.name || "User"}!
           </p>
           <div className="flex items-center gap-4 mt-2">
             <span className="text-white/60 text-sm">
@@ -292,14 +321,20 @@ export default function DashboardPage() {
               Permissions: {user?.role?.permissions?.length || 0}
             </span>
             <span className="text-white/60 text-sm">•</span>
-            <span className={`text-xs px-2 py-1 rounded ${
-              dataSource === 'api' ? 'bg-green-500/20 text-green-300' :
-              dataSource === 'cookie' ? 'bg-blue-500/20 text-blue-300' :
-              'bg-gray-500/20 text-gray-300'
-            }`}>
-              {dataSource === 'api' ? '🔄 Live Data' : 
-               dataSource === 'cookie' ? '🍪 Cached' : 
-               '👤 Guest'}
+            <span
+              className={`text-xs px-2 py-1 rounded ${
+                dataSource === "api"
+                  ? "bg-green-500/20 text-green-300"
+                  : dataSource === "cookie"
+                  ? "bg-blue-500/20 text-blue-300"
+                  : "bg-gray-500/20 text-gray-300"
+              }`}
+            >
+              {dataSource === "api"
+                ? "🔄 Live Data"
+                : dataSource === "cookie"
+                ? "🍪 Cached"
+                : "👤 Guest"}
             </span>
           </div>
         </div>
@@ -320,10 +355,10 @@ export default function DashboardPage() {
             <span className="text-white/60">Created:</span>
             <div className="text-white">
               {user?.created_at
-                ? new Date(user.created_at).toLocaleDateString('id-ID', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                ? new Date(user.created_at).toLocaleDateString("id-ID", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })
                 : "N/A"}
             </div>
@@ -332,10 +367,10 @@ export default function DashboardPage() {
             <span className="text-white/60">Last Updated:</span>
             <div className="text-white">
               {user?.updated_at
-                ? new Date(user.updated_at).toLocaleDateString('id-ID', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                ? new Date(user.updated_at).toLocaleDateString("id-ID", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })
                 : "N/A"}
             </div>
@@ -392,7 +427,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Bar Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
+        <div className="bg-white p-6 rounded-lg shadow-lg ">
           <h2 className="text-lg font-semibold mb-4 text-gray-800">
             Penjualan Bulanan
           </h2>

@@ -1,17 +1,39 @@
-'use client';
+"use client";
 
-import Cookies from 'js-cookie';
+import { useEffect, useState } from "react";
+import Cookies from "js-cookie";
 
 interface PermissionGuardProps {
-  permission: string;
+  permissions: string[];
+  requireAll?: boolean;
   children: React.ReactNode;
 }
 
-export default function PermissionGuard({ permission, children }: PermissionGuardProps) {
-  const raw = Cookies.get('permissions') || '[]';
-  const permissions: string[] = JSON.parse(raw);
+export default function PermissionGuard({
+  permissions,
+  requireAll = false,
+  children,
+}: PermissionGuardProps) {
+  const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
 
-  if (!permissions.includes(permission)) return null;
+  useEffect(() => {
+    const raw = Cookies.get("permissions") || "[]";
+    try {
+      const parsed = JSON.parse(raw);
+      setUserPermissions(parsed);
+    } catch {
+      setUserPermissions([]);
+    }
+  }, []);
+
+  // Saat belum siap, bisa render loading state / null
+  if (userPermissions === null) return null;
+
+  const hasPermission = requireAll
+    ? permissions.every((p) => userPermissions.includes(p))
+    : permissions.some((p) => userPermissions.includes(p));
+
+  if (!hasPermission) return null;
 
   return <>{children}</>;
 }

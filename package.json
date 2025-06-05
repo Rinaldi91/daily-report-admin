@@ -1,5 +1,5 @@
 {
-  "name": "dailyreport-admin-panel",
+  "name": "report-admin",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -25,7 +25,10 @@
     "react-calendar": "^6.0.0",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",
-    "recharts": "^2.15.3"
+    "react-select": "^5.10.1",
+    "recharts": "^2.15.3",
+    "sweetalert2": "^11.22.0",
+    "sweetalert2-react-content": "^5.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

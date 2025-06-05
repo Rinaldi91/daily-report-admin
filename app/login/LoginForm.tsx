@@ -1,10 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useEffect, JSX } from 'react';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
-import { Eye, EyeOff, LogIn, Mail, Lock, Building2 } from 'lucide-react';
+import { useState, useEffect, JSX } from "react";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
+import { Eye, EyeOff, LogIn, Mail, Lock, Building2 } from "lucide-react";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
+const MySwal = withReactContent(Swal);
 
 interface LoginResponse {
   token: string;
@@ -19,17 +23,17 @@ interface LoginResponse {
 export default function LoginForm(): JSX.Element {
   const router = useRouter();
 
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [remember, setRemember] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Ambil email & password dari cookie jika remember me aktif
   useEffect(() => {
-    const savedEmail = Cookies.get('remember_email');
-    const savedPassword = Cookies.get('remember_password');
+    const savedEmail = Cookies.get("remember_email");
+    const savedPassword = Cookies.get("remember_password");
     if (savedEmail && savedPassword) {
       setEmail(savedEmail);
       setPassword(savedPassword);
@@ -37,58 +41,84 @@ export default function LoginForm(): JSX.Element {
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault();
-    
+
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await axios.post<LoginResponse>('http://report-api.test/api/login', {
-        email,
-        password,
-      });
+      const res = await axios.post<LoginResponse>(
+        "http://report-api.test/api/login",
+        { email, password }
+      );
 
       const { token, data } = res.data;
       const cookieOptions = remember ? { expires: 7 } : { expires: 1 };
 
       // Simpan cookie login
-      Cookies.set('token', token, cookieOptions);
-      Cookies.set('role', data.role.slug, cookieOptions);
-      Cookies.set('user', JSON.stringify(data), cookieOptions);
+      Cookies.set("token", token, cookieOptions);
+      Cookies.set("role", data.role.slug, cookieOptions);
+      Cookies.set("user", JSON.stringify(data), cookieOptions);
 
-      const permissionSlugs = data.role.permissions.map((p: { slug: string }) => p.slug);
-      Cookies.set('permissions', JSON.stringify(permissionSlugs), cookieOptions);
+      const permissionSlugs = data.role.permissions.map(
+        (p: { slug: string }) => p.slug
+      );
+      Cookies.set(
+        "permissions",
+        JSON.stringify(permissionSlugs),
+        cookieOptions
+      );
 
-      // Simpan email & password jika remember me dicentang
+      // Simpan email/password kalau Remember me aktif
       if (remember) {
-        Cookies.set('remember_email', email, { expires: 7 });
-        Cookies.set('remember_password', password, { expires: 7 });
+        Cookies.set("remember_email", email, { expires: 7 });
+        Cookies.set("remember_password", password, { expires: 7 });
       } else {
-        Cookies.remove('remember_email');
-        Cookies.remove('remember_password');
+        Cookies.remove("remember_email");
+        Cookies.remove("remember_password");
       }
 
-      router.push('/dashboard');
+      // ✅ Notifikasi sukses
+      await MySwal.fire({
+        icon: "success",
+        title: "Login Successful!",
+        text: "Redirecting to dashboard...",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#111827",
+        color: "#F9FAFB",
+        customClass: {
+          popup: "rounded-xl",
+        },
+      });
+
+      router.push("/dashboard");
     } catch (error) {
-      console.error('Login error:', error);
-      setError('Login gagal. Periksa email dan password.');
-    } finally {
-      setIsLoading(false);
+      console.error("Login error:", error);
+      setError("Login gagal. Periksa email dan password.");
+
+      // ❌ Notifikasi gagal
+      MySwal.fire({
+        icon: "error",
+        title: "Login Failed",
+        text: "Invalid email or password",
+      });
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       // Form akan otomatis submit karena button type="submit"
       // Tidak perlu manual submit di sini
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4 w-full">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-900 flex items-center justify-center p-4 w-full">
       <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full flex min-h-[600px]">
-        
         {/* Left Card - Logo & Company Info */}
         <div className="bg-gradient-to-br from-red-600 to-red-700 text-white p-12 flex flex-col justify-center items-center w-1/2 relative overflow-hidden">
           {/* Background Pattern */}
@@ -99,30 +129,32 @@ export default function LoginForm(): JSX.Element {
             <div className="absolute top-20 right-32 w-12 h-12 bg-white rounded-full"></div>
             <div className="absolute bottom-32 left-20 w-8 h-8 bg-white rounded-full"></div>
           </div>
-          
+
           {/* Logo Section */}
           <div className="text-center z-10 relative">
             <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
               <Building2 className="w-12 h-12 text-black" />
             </div>
-            
-            <h1 className="text-2xl font-bold mb-4">PT. Anugerah Rezeki Bersama Indonesia</h1>
+
+            <h1 className="text-2xl font-bold mb-4">
+              PT. Anugerah Rezeki Bersama Indonesia
+            </h1>
             <p className="text-red-100 text-lg mb-8 leading-relaxed max-w-xs">
-              Sistem Pelaporan Terintegrasi untuk Manajemen Data yang Efisien
+              Integrated Reporting System for Efficient Data Management
             </p>
-            
+
             <div className="space-y-4 text-red-100">
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-red-300 rounded-full"></div>
-                <span className="text-sm">Akses Aman & Terpercaya</span>
+                <span className="text-sm">Secure & Reliable Access</span>
               </div>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-red-300 rounded-full"></div>
-                <span className="text-sm">Dashboard Komprehensif</span>
+                <span className="text-sm">Comprehensive Dashboard</span>
               </div>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-red-300 rounded-full"></div>
-                <span className="text-sm">Laporan Real-time</span>
+                <span className="text-sm">Real-time Reports</span>
               </div>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-2 h-2 bg-red-300 rounded-full"></div>
@@ -135,16 +167,16 @@ export default function LoginForm(): JSX.Element {
         {/* Right Card - Login Form */}
         <div className="w-1/2 p-12 flex flex-col justify-center bg-gray-50">
           <div className="max-w-sm mx-auto w-full">
-            
             {/* Header */}
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">Selamat Datang</h2>
-              <p className="text-gray-600">Silakan masuk ke akun Anda</p>
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                Welcome Back
+              </h2>
+              <p className="text-gray-600">Please sign in to your account</p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              
               {/* Error Message */}
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
@@ -155,8 +187,11 @@ export default function LoginForm(): JSX.Element {
 
               {/* Email Field */}
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
-                  Alamat Email
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  Email Address
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -166,8 +201,10 @@ export default function LoginForm(): JSX.Element {
                     id="email"
                     type="email"
                     value={email}
-                    placeholder="nama@perusahaan.com"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                    placeholder="name@company.com"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setEmail(e.target.value)
+                    }
                     onKeyPress={handleKeyPress}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 text-gray-900 placeholder-gray-500 bg-white"
                     required
@@ -179,8 +216,11 @@ export default function LoginForm(): JSX.Element {
 
               {/* Password Field */}
               <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
-                  Kata Sandi
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  Password
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -188,10 +228,12 @@ export default function LoginForm(): JSX.Element {
                   </div>
                   <input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     placeholder="••••••••••"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setPassword(e.target.value)
+                    }
                     onKeyPress={handleKeyPress}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 text-gray-900 placeholder-gray-500 bg-white"
                     required
@@ -203,7 +245,9 @@ export default function LoginForm(): JSX.Element {
                     className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-100 rounded-r-lg transition-colors duration-200"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -221,12 +265,17 @@ export default function LoginForm(): JSX.Element {
                     id="remember"
                     type="checkbox"
                     checked={remember}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemember(e.target.checked)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setRemember(e.target.checked)
+                    }
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded transition-colors duration-200"
                     disabled={isLoading}
                   />
-                  <label htmlFor="remember" className="ml-2 text-sm text-gray-700 font-medium">
-                    Ingat saya
+                  <label
+                    htmlFor="remember"
+                    className="ml-2 text-sm text-gray-700 font-medium"
+                  >
+                    Remember me
                   </label>
                 </div>
                 <div>
@@ -235,7 +284,7 @@ export default function LoginForm(): JSX.Element {
                     className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200 font-medium hover:underline"
                     disabled={isLoading}
                   >
-                    Lupa kata sandi?
+                    Forgot password?
                   </button>
                 </div>
               </div>
@@ -246,14 +295,14 @@ export default function LoginForm(): JSX.Element {
                 disabled={isLoading || !email || !password}
                 className={`w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-white font-semibold transition-all duration-200 cursor-pointer ${
                   isLoading || !email || !password
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0'
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-red-600 hover:bg-red-700 hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0"
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
               >
                 {isLoading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Sedang Masuk...
+                    Signing in...
                   </>
                 ) : (
                   <>
@@ -267,13 +316,13 @@ export default function LoginForm(): JSX.Element {
             {/* Footer */}
             <div className="mt-8 text-center">
               <p className="text-sm text-gray-600">
-                Belum punya akun?{' '}
+                Don’t have an account?{" "}
                 <button
                   type="button"
                   className="text-red-600 hover:text-red-700 font-semibold transition-colors duration-200 hover:underline"
                   disabled={isLoading}
                 >
-                  Hubungi Administrator
+                  Contact Administrator
                 </button>
               </p>
             </div>
