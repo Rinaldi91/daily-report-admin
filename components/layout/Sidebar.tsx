@@ -19,6 +19,10 @@ import {
   Building2,
   ClipboardTypeIcon,
   Hospital,
+  MonitorSmartphone,
+  Layers2,
+  FileBoxIcon,
+  MonitorCog,
 } from "lucide-react";
 
 interface MenuItem {
@@ -69,6 +73,18 @@ const menuItems: MenuItem[] = [
     href: "#",
     icon: Building2,
     children: [
+      {
+        label: "Device Categories ",
+        href: "/dashboard/medical-device-categories",
+        icon: MonitorCog,
+        permission: "view-medical-device-category",
+      },
+      {
+        label: "Medical Devices ",
+        href: "/dashboard/medical-devices",
+        icon: MonitorSmartphone,
+        permission: "view-medical-device",
+      },
        {
         label: "Type Of Facilities",
         href: "/dashboard/type-of-health-facilities",
@@ -81,6 +97,19 @@ const menuItems: MenuItem[] = [
         icon: Hospital,
         permission: "view-health-facility",
       },
+      {
+        label: "Divisions",
+        href: "/dashboard/divisions",
+        icon: Layers2,
+        permission: "view-division",
+      },
+      {
+        label: "Positions",
+        href: "/dashboard/positions",
+        icon: FileBoxIcon,
+        permission: "view-position",
+      },
+
     ],
   },
 ];
@@ -191,7 +220,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                   onMouseEnter={() => handleMouseEnter(item.label)}
                   onMouseLeave={handleMouseLeave}
                   className={clsx(
-                    "w-full px-3 py-2 font-semibold text-white flex items-center gap-2 hover:bg-red-700 rounded transition cursor-pointer",
+                    "w-full px-3 py-2 text-white flex items-center gap-2 hover:bg-red-700 rounded transition cursor-pointer",
                     collapsed ? "justify-center" : ""
                   )}
                   title={collapsed ? item.label : undefined}
@@ -199,7 +228,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                   <item.icon size={20} className="flex-shrink-0" />
                   {!collapsed && (
                     <>
-                      <span className="flex-1 text-left font-semibold">{item.label}</span>
+                      <span className="flex-1 text-left">{item.label}</span>
                       {isOpen ? (
                         <ChevronDown className="w-4 h-4 flex-shrink-0" />
                       ) : (
@@ -211,7 +240,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
 
                 {/* Normal submenu when not collapsed */}
                 {isOpen && !collapsed && (
-                  <div className="ml-4 mt-1 flex flex-col gap-1 font-semibold">
+                  <div className="ml-4 mt-1 flex flex-col gap-1">
                     {(item.children ?? [])
                       .filter((child) => hasPermission(child.permission))
                       .map((child) => {
@@ -246,7 +275,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                     onMouseLeave={handlePopupMouseLeave}
                   >
                     <div className="p-2">
-                      <div className="px-3 py-2 text-white font-semibold border-b border-gray-700 mb-2">
+                      <div className="px-3 py-2 text-white border-b border-gray-700 mb-2">
                         {item.label}
                       </div>
                       <div className="flex flex-col gap-1">

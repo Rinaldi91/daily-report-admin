@@ -9,10 +9,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  Eye,
   UserCheck,
   UserX,
-  Users
+  Users,
 } from "lucide-react";
 
 type User = {
@@ -53,15 +52,15 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [perPage, setPerPage] = useState(10);
-  const [permissions, setPermissions] = useState<string[]>([]);
 
+  const [permissions, setPermissions] = useState<string[]>([]);
   const searchParams = useSearchParams();
   const router = useRouter();
-
   const initialSearch = searchParams.get("search") || "";
   const [searchTerm, setSearchTerm] = useState(initialSearch);
 
@@ -72,6 +71,62 @@ export default function UsersPage() {
       setPermissions(JSON.parse(stored));
     }
   }, []);
+
+  // Fetch users from API
+  const fetchUsers = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
+        // Build URL with query parameters
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) {
+          params.append("search", search.trim());
+        }
+
+        const response = await fetch(
+          `http://report-api.test/api/users?${params.toString()}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result: ApiResponse = await response.json();
+
+        if (result.status && result.data) {
+          setUsers(result.data);
+          setCurrentPage(result.meta.current_page);
+          setTotalPages(result.meta.last_page);
+          setTotalUsers(result.meta.total);
+          setPerPage(result.meta.per_page);
+        } else {
+          throw new Error(result.message || "Failed to fetch users");
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError(err instanceof Error ? err.message : "Failed to load users");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -87,20 +142,20 @@ export default function UsersPage() {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchTerm]);
+  }, [searchTerm, router, fetchUsers]);
 
   useEffect(() => {
     if (initialSearch.length === 0 || initialSearch.length >= 3) {
       fetchUsers(1, initialSearch);
     }
-  }, [initialSearch]);
+  }, [initialSearch, fetchUsers]);
 
   useEffect(() => {
     if (searchTerm === "") {
       fetchUsers(1, "");
       router.replace("/dashboard/users");
     }
-  }, [searchTerm, router]);
+  }, [searchTerm, router, fetchUsers]);
 
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,70 +175,17 @@ export default function UsersPage() {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [searchTerm, router]);
+  }, [searchTerm, fetchUsers]);
 
   // Check if user has specific permission
   const hasPermission = (permission: string) => {
     return permissions.includes(permission);
   };
 
-  // Fetch users from API
-  const fetchUsers = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const token = Cookies.get("token");
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      // Build URL with query parameters
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) {
-        params.append("search", search.trim());
-      }
-
-      const response = await fetch(
-        `http://report-api.test/api/users?${params.toString()}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result: ApiResponse = await response.json();
-
-      if (result.status && result.data) {
-        setUsers(result.data);
-        setCurrentPage(result.meta.current_page);
-        setTotalPages(result.meta.last_page);
-        setTotalUsers(result.meta.total);
-        setPerPage(result.meta.per_page);
-      } else {
-        throw new Error(result.message || "Failed to fetch users");
-      }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError(err instanceof Error ? err.message : "Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Initial load
   useEffect(() => {
     fetchUsers(1, initialSearch);
-  }, []);
+  }, [fetchUsers, initialSearch]);
 
   // Handle pagination
   const handlePageChange = useCallback(
@@ -193,7 +195,7 @@ export default function UsersPage() {
         fetchUsers(page, searchTerm);
       }
     },
-    [searchTerm, totalPages]
+    [searchTerm, totalPages, fetchUsers]
   );
 
   // Generate pagination numbers
@@ -332,6 +334,9 @@ export default function UsersPage() {
             <thead className="bg-gray-800 text-gray-800 border-b">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  No
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   User
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
@@ -349,8 +354,11 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="bg-gray-900 divide-y divide-gray-800">
-              {users.map((user) => (
+              {users.map((user, index) => (
                 <tr key={user.id} className="hover:bg-gray-800">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                    {(currentPage - 1) * perPage + index + 1}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-blue-300 rounded-full flex items-center justify-center">
@@ -397,11 +405,11 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {hasPermission("show-users") && (
+                      {/* {hasPermission("show-users") && (
                         <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
                           <Eye className="w-4 h-4" />
                         </button>
-                      )}
+                      )} */}
                       {hasPermission("update-users") && (
                         <button className="text-green-400 hover:text-green-300 p-1 cursor-pointer">
                           <Edit className="w-4 h-4" />
@@ -487,14 +495,14 @@ export default function UsersPage() {
       )}
 
       {/* Loading overlay */}
-      {loading && users.length > 0 && searchTerm.length === 0 && (
+      {/* {loading && users.length > 0 && searchTerm.length === 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
             <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
             <div className="text-sm text-gray-300">Updating...</div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

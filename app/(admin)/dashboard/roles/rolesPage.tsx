@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { Eye, Edit, Trash2, Shield, Plus, Search } from "lucide-react";
+import { Edit, Trash2, Shield, Plus, Search, X, Save } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -33,8 +33,12 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRoles, setTotalRoles] = useState(0);
+  const [perPage, setPerPage] = useState(10);
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [permissions, setPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -55,21 +59,21 @@ export default function RolesPage() {
       if (!token) {
         throw new Error("Token not found");
       }
-      
+
       const res = await fetch("http://report-api.test/api/permission", {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
       });
-      
+
       if (!res.ok) {
         throw new Error("Failed to fetch permissions");
       }
-      
+
       const json = await res.json();
       console.log("Permissions response:", json); // Debug log
-      
+
       // Handle different response structures
       let permissionsData = [];
       if (Array.isArray(json.data)) {
@@ -79,7 +83,7 @@ export default function RolesPage() {
       } else if (json.permissions && Array.isArray(json.permissions)) {
         permissionsData = json.permissions;
       }
-      
+
       console.log("Processed permissions:", permissionsData); // Debug log
       setAllPermissions(permissionsData);
     } catch (error) {
@@ -113,7 +117,7 @@ export default function RolesPage() {
       const json = await res.json();
 
       // Safe data handling dengan default values
-      const rolesData = Array.isArray(json.data) 
+      const rolesData = Array.isArray(json.data)
         ? json.data.map((r: Partial<Role>) => ({
             id: r.id || 0,
             name: r.name || "",
@@ -126,8 +130,10 @@ export default function RolesPage() {
         : [];
 
       setRoles(rolesData);
-      setCurrentPage(json.meta?.current_page || 1);
-      setTotalPages(json.meta?.last_page || 1);
+      setCurrentPage(json.meta.current_page);
+      setTotalPages(json.meta.last_page);
+      setTotalRoles(json.meta.total);
+      setPerPage(json.meta.per_page);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error fetching roles");
       setRoles([]); // Set empty array pada error
@@ -141,8 +147,8 @@ export default function RolesPage() {
       id: role.id,
       name: role.name || "",
       description: role.description || "",
-      permission_ids: Array.isArray(role.permissions) 
-        ? role.permissions.map((p) => p.id) 
+      permission_ids: Array.isArray(role.permissions)
+        ? role.permissions.map((p) => p.id)
         : [],
     });
     setIsModalOpen(true);
@@ -169,7 +175,9 @@ export default function RolesPage() {
       const payload = {
         name: formData.name,
         description: formData.description,
-        permission_ids: Array.isArray(formData.permission_ids) ? formData.permission_ids : []
+        permission_ids: Array.isArray(formData.permission_ids)
+          ? formData.permission_ids
+          : [],
       };
 
       console.log("Submitting payload:", payload); // Debug log
@@ -190,17 +198,35 @@ export default function RolesPage() {
         setIsModalOpen(false);
         setFormData({ name: "", description: "", permission_ids: [] }); // Reset form
         fetchRoles();
-        Swal.fire("Success", "Role has been saved", "success");
+        Swal.fire({
+          title: "Success",
+          text: "Role has been saved",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          timerProgressBar: true,
+          background: "#1f2937",
+          color: "#F9FAFB",
+          customClass: {
+            popup: "rounded-xl p-6",
+          },
+        });
       } else {
         const errorData = await res.json();
         console.error("Error response:", errorData); // Debug log
-        
+
         // Handle validation errors
         if (errorData.errors) {
-          const errorMessages = Object.values(errorData.errors).flat().join("\n");
+          const errorMessages = Object.values(errorData.errors)
+            .flat()
+            .join("\n");
           Swal.fire("Validation Error", errorMessages, "error");
         } else {
-          Swal.fire("Error", errorData.message || "Failed to save role", "error");
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to save role",
+            "error"
+          );
         }
       }
     } catch (error) {
@@ -216,10 +242,10 @@ export default function RolesPage() {
       icon: "warning",
       showCancelButton: true,
       background: "#111827",
-        color: "#F9FAFB",
-        customClass: {
-          popup: "rounded-xl",
-        },
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
       confirmButtonText: "Yes, delete it!",
     });
 
@@ -240,10 +266,26 @@ export default function RolesPage() {
 
         if (res.ok) {
           fetchRoles();
-          Swal.fire("Deleted!", "Role has been deleted.", "success");
+          Swal.fire({
+            title: "Deleted!",
+            text: "Role has been deleted.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
         } else {
           const errorData = await res.json();
-          Swal.fire("Error", errorData.message || "Failed to delete role", "error");
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to delete role",
+            "error"
+          );
         }
       } catch (error) {
         console.error("Error deleting role:", error);
@@ -264,14 +306,11 @@ export default function RolesPage() {
           setPermissions([]);
         }
       }
-      
+
       // Fetch data
-      await Promise.all([
-        fetchRoles(),
-        fetchPermissions()
-      ]);
+      await Promise.all([fetchRoles(), fetchPermissions()]);
     };
-    
+
     initializeData();
   }, []);
 
@@ -286,10 +325,45 @@ export default function RolesPage() {
     };
   }, [searchTerm]);
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      fetchRoles(page, searchTerm);
+  // Handle pagination
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= totalPages) {
+        setCurrentPage(page);
+        fetchRoles(page, searchTerm);
+      }
+    },
+    [searchTerm, totalPages, fetchRoles]
+  );
+
+  const getPaginationNumbers = () => {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
     }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, "...");
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    rangeWithDots.push(...range);
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push("...", totalPages);
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages);
+    }
+
+    return rangeWithDots;
   };
 
   return (
@@ -342,6 +416,9 @@ export default function RolesPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider w-[7%]">
+                  No
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider w-[15%]">
                   Role Name
                 </th>
@@ -354,48 +431,55 @@ export default function RolesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {Array.isArray(roles) && roles.map((role) => (
-                <tr key={role.id} className="hover:bg-gray-800">
-                  <td className="px-6 py-4 text-white w-[15%]">{role.name || ""}</td>
-                  <td className="px-6 py-4 text-gray-300 text-sm">
-                    <div className="flex flex-wrap gap-1">
-                      {Array.isArray(role.permissions) && role.permissions.map((p) => (
-                        <span
-                          key={p.id}
-                          className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-700 text-white"
-                        >
-                          {p.name || ""}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {hasPermission("show-roles") && (
+              {Array.isArray(roles) &&
+                roles.map((role, index) => (
+                  <tr key={role.id} className="hover:bg-gray-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                      {(currentPage - 1) * perPage + index + 1}
+                    </td>
+                    <td className="px-6 py-4 text-white w-[15%]">
+                      {role.name || ""}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300 text-sm">
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(role.permissions) &&
+                          role.permissions.map((p) => (
+                            <span
+                              key={p.id}
+                              className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-700 text-white"
+                            >
+                              {p.name || ""}
+                            </span>
+                          ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* {hasPermission("show-roles") && (
                         <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
                           <Eye className="w-4 h-4" />
                         </button>
-                      )}
-                      {hasPermission("update-roles") && (
-                        <button
-                          onClick={() => handleEdit(role)}
-                          className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      )}
-                      {hasPermission("delete-roles") && (
-                        <button
-                          onClick={() => handleDelete(role.id)}
-                          className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      )} */}
+                        {hasPermission("update-roles") && (
+                          <button
+                            onClick={() => handleEdit(role)}
+                            className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission("delete-roles") && (
+                          <button
+                            onClick={() => handleDelete(role.id)}
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
 
               {(!Array.isArray(roles) || roles.length === 0) && !loading && (
                 <tr>
@@ -419,27 +503,58 @@ export default function RolesPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center space-x-2">
-            {[...Array(totalPages)].map((_, i) => {
-              const page = i + 1;
-              return (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`px-4 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
-                    currentPage === page
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-gray-600 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            })}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-gray-400">
+            Showing {(currentPage - 1) * perPage + 1} to{" "}
+            {Math.min(currentPage * perPage, totalRoles)} of {totalRoles}{" "}
+            results
           </div>
-        )}
+
+          <div className="flex items-center space-x-1">
+            {/* Previous button */}
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              Previous
+            </button>
+
+            {/* Page numbers */}
+            {getPaginationNumbers().map((page, index) => (
+              <div key={index}>
+                {page === "..." ? (
+                  <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
+                      currentPage === page
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {/* Next button */}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       </div>
-      
+
       {/* Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
@@ -472,11 +587,16 @@ export default function RolesPage() {
               <div>
                 <label className="block text-sm mb-1">Permissions</label>
                 {allPermissions.length === 0 ? (
-                  <div className="text-gray-400 text-sm">Loading permissions...</div>
+                  <div className="text-gray-400 text-sm">
+                    Loading permissions...
+                  </div>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-600 rounded p-2 bg-gray-700">
                     {allPermissions.map((perm) => (
-                      <label key={perm.id} className="flex items-center space-x-2 cursor-pointer">
+                      <label
+                        key={perm.id}
+                        className="flex items-center space-x-2 cursor-pointer"
+                      >
                         <input
                           type="checkbox"
                           checked={formData.permission_ids.includes(perm.id)}
@@ -484,18 +604,25 @@ export default function RolesPage() {
                             if (e.target.checked) {
                               setFormData({
                                 ...formData,
-                                permission_ids: [...formData.permission_ids, perm.id]
+                                permission_ids: [
+                                  ...formData.permission_ids,
+                                  perm.id,
+                                ],
                               });
                             } else {
                               setFormData({
                                 ...formData,
-                                permission_ids: formData.permission_ids.filter(id => id !== perm.id)
+                                permission_ids: formData.permission_ids.filter(
+                                  (id) => id !== perm.id
+                                ),
                               });
                             }
                           }}
                           className="rounded"
                         />
-                        <span className="text-sm text-white">{perm.name || ""}</span>
+                        <span className="text-sm text-white">
+                          {perm.name || ""}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -506,15 +633,26 @@ export default function RolesPage() {
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"
+                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer flex items-center gap-2"
               >
+                <X className="w-4 h-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 cursor-pointer"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2"
               >
-                Create
+                {formData?.id ? (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Update
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Create
+                  </>
+                )}
               </button>
             </div>
           </Dialog.Content>

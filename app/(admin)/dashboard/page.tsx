@@ -270,7 +270,7 @@ export default function DashboardPage() {
           <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-white text-lg">Loading dashboard...</div>
           <div className="text-white/60 text-sm mt-2">
-            Fetching user data...
+            Fetching data...
           </div>
         </div>
       </div>

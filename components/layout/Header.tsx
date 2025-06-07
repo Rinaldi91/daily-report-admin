@@ -1,13 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import {
-  FileText,
-  LogOut,
-  Search,
-  ChevronLeft,
-} from "lucide-react";
+import { FileText, LogOut, Search, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
@@ -49,9 +44,52 @@ const menuItems: MenuItem[] = [
     href: "/dashboard/roles",
     permission: "view-roles",
   },
+  {
+    label: "Permissions",
+    href: "/dashboard/permissions",
+    permission: "view-roles",
+  },
+  {
+    label: "Roles",
+    href: "/dashboard/roles",
+    permission: "view-roles",
+  },
+  {
+    label: "Device Categories ",
+    href: "/dashboard/medical-device-categories",
+    permission: "view-medical-device-category",
+  },
+  {
+    label: "Medical Devices ",
+    href: "/dashboard/medical-devices",
+    permission: "view-medical-device",
+  },
+  {
+    label: "Type Of Facilities",
+    href: "/dashboard/type-of-health-facilities",
+    permission: "view-type-of-health-facility",
+  },
+  {
+    label: "Health Facilities",
+    href: "/dashboard/health-facilities",
+    permission: "view-health-facility",
+  },
+  {
+    label: "Divisions",
+    href: "/dashboard/divisions",
+    permission: "view-division",
+  },
+  {
+    label: "Positions",
+    href: "/dashboard/positions",
+    permission: "view-position",
+  },
 ];
 
-export default function Header({ onToggleSidebar, isSidebarCollapsed = false }: HeaderProps) {
+export default function Header({
+  onToggleSidebar,
+  isSidebarCollapsed = false,
+}: HeaderProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,10 +133,14 @@ export default function Header({ onToggleSidebar, isSidebarCollapsed = false }: 
     return result;
   };
 
-  const hasPermission = (perm?: string) => {
-    if (!perm) return true;
-    return permissions.includes(perm);
-  };
+  // Moved hasPermission inside useCallback to fix dependency issue
+  const hasPermission = useCallback(
+    (perm?: string) => {
+      if (!perm) return true;
+      return permissions.includes(perm);
+    },
+    [permissions]
+  );
 
   // Filter menus based on search term
   useEffect(() => {
@@ -115,7 +157,7 @@ export default function Header({ onToggleSidebar, isSidebarCollapsed = false }: 
     );
 
     setFilteredMenus(filtered);
-  }, [searchTerm, permissions]);
+  }, [searchTerm, hasPermission]); // Added hasPermission to dependencies
 
   // Handle click outside to close search dropdown
   useEffect(() => {
@@ -199,15 +241,15 @@ export default function Header({ onToggleSidebar, isSidebarCollapsed = false }: 
         </div>
 
         {/* Navigation Back Button - Now with toggle functionality */}
-        <button 
+        <button
           onClick={handleToggleSidebar}
           className="p-2 hover:bg-red-600 rounded-lg transition-colors mr-2 cursor-pointer"
           title={isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"}
         >
-          <ChevronLeft 
+          <ChevronLeft
             className={`w-5 h-5 text-white transition-transform duration-200 ${
-              isSidebarCollapsed ? 'rotate-180' : ''
-            }`} 
+              isSidebarCollapsed ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -245,7 +287,7 @@ export default function Header({ onToggleSidebar, isSidebarCollapsed = false }: 
           {/* No Results Message */}
           {searchTerm.trim() !== "" && filteredMenus.length === 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-4 text-center text-gray-500">
-              No menu items found for "{searchTerm}"
+              No menu items found for &quot;{searchTerm}&quot;
             </div>
           )}
         </div>

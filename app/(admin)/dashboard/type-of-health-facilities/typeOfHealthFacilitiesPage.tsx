@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { Eye, Edit, Trash2, Building2, Plus, Search } from "lucide-react";
+import {
+  Edit,
+  Trash2,
+  ClipboardTypeIcon,
+  Plus,
+  Search,
+  X,
+  Save,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -23,11 +31,17 @@ interface FormTypeOfHealthFacility {
 }
 
 export default function TypeOfHealthFacilitiesPage() {
-  const [typeOfHealthFacilities, setTypeOfHealthFacilities] = useState<TypeOfHealthFacility[]>([]);
+  const [typeOfHealthFacilities, setTypeOfHealthFacilities] = useState<
+    TypeOfHealthFacility[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTypeOfFacility, setTotalTypeOfFacility] = useState(0);
+  const [perPage, setPerPage] = useState(10);
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -41,7 +55,10 @@ export default function TypeOfHealthFacilitiesPage() {
 
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchTypeOfHealthFacilities = async (page: number = 1, search: string = "") => {
+  const fetchTypeOfHealthFacilities = async (
+    page: number = 1,
+    search: string = ""
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -66,7 +83,7 @@ export default function TypeOfHealthFacilitiesPage() {
       const json = await res.json();
 
       // Safe data handling dengan default values
-      const facilitiesData = Array.isArray(json.data) 
+      const facilitiesData = Array.isArray(json.data)
         ? json.data.map((f: Partial<TypeOfHealthFacility>) => ({
             id: f.id || 0,
             name: f.name || "",
@@ -78,10 +95,16 @@ export default function TypeOfHealthFacilitiesPage() {
         : [];
 
       setTypeOfHealthFacilities(facilitiesData);
-      setCurrentPage(json.meta?.current_page || 1);
-      setTotalPages(json.meta?.last_page || 1);
+      setCurrentPage(json.meta.current_page);
+      setTotalPages(json.meta.last_page);
+      setTotalTypeOfFacility(json.meta.total);
+      setPerPage(json.meta.per_page);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error fetching type of health facilities");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error fetching type of health facilities"
+      );
       setTypeOfHealthFacilities([]); // Set empty array pada error
     } finally {
       setLoading(false);
@@ -91,9 +114,9 @@ export default function TypeOfHealthFacilitiesPage() {
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
       .trim();
   };
 
@@ -121,14 +144,14 @@ export default function TypeOfHealthFacilitiesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/type-of-health-facility/${formData.slug}`
+        ? `http://report-api.test/api/type-of-health-facility/${formData.id}`
         : "http://report-api.test/api/type-of-health-facility";
 
       // Prepare JSON payload
       const payload = {
         name: formData.name,
         slug: formData.slug || generateSlug(formData.name),
-        description: formData.description || null
+        description: formData.description || null,
       };
 
       console.log("Submitting payload:", payload); // Debug log
@@ -149,17 +172,35 @@ export default function TypeOfHealthFacilitiesPage() {
         setIsModalOpen(false);
         setFormData({ name: "", slug: "", description: "" }); // Reset form
         fetchTypeOfHealthFacilities();
-        Swal.fire("Success", "Type of health facility has been saved", "success");
+        Swal.fire({
+          title: "Success",
+          text: "Type of helath facility has been saved",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          timerProgressBar: true,
+          background: "#1f2937",
+          color: "#F9FAFB",
+          customClass: {
+            popup: "rounded-xl p-6",
+          },
+        });
       } else {
         const errorData = await res.json();
         console.error("Error response:", errorData); // Debug log
-        
+
         // Handle validation errors
         if (errorData.errors) {
-          const errorMessages = Object.values(errorData.errors).flat().join("\n");
+          const errorMessages = Object.values(errorData.errors)
+            .flat()
+            .join("\n");
           Swal.fire("Validation Error", errorMessages, "error");
         } else {
-          Swal.fire("Error", errorData.message || "Failed to save type of health facility", "error");
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to save type of health facility",
+            "error"
+          );
         }
       }
     } catch (error) {
@@ -175,10 +216,10 @@ export default function TypeOfHealthFacilitiesPage() {
       icon: "warning",
       showCancelButton: true,
       background: "#111827",
-        color: "#F9FAFB",
-        customClass: {
-          popup: "rounded-xl",
-        },
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
       confirmButtonText: "Yes, delete it!",
     });
 
@@ -189,20 +230,39 @@ export default function TypeOfHealthFacilitiesPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/type-of-health-facility/${slug}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+        const res = await fetch(
+          `http://report-api.test/api/type-of-health-facility/${slug}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (res.ok) {
           fetchTypeOfHealthFacilities();
-          Swal.fire("Deleted!", "Type of health facility has been deleted.", "success");
+          Swal.fire({
+            title: "Deleted!",
+            text: "Type of health facility has been deleted.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
         } else {
           const errorData = await res.json();
-          Swal.fire("Error", errorData.message || "Failed to delete type of health facility", "error");
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to delete type of health facility",
+            "error"
+          );
         }
       } catch (error) {
         console.error("Error deleting type of health facility:", error);
@@ -223,11 +283,11 @@ export default function TypeOfHealthFacilitiesPage() {
           setUserPermissions([]);
         }
       }
-      
+
       // Fetch data
       await fetchTypeOfHealthFacilities();
     };
-    
+
     initializeData();
   }, []);
 
@@ -244,27 +304,62 @@ export default function TypeOfHealthFacilitiesPage() {
 
   // Auto-generate slug when name changes
   useEffect(() => {
-    if (formData.name) { // Only auto-generate for new facilities
-      setFormData(prev => ({
+    if (formData.name) {
+      // Only auto-generate for new facilities
+      setFormData((prev) => ({
         ...prev,
-        slug: generateSlug(prev.name)
+        slug: generateSlug(prev.name),
       }));
     }
   }, [formData.name, formData.id]);
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      fetchTypeOfHealthFacilities(page, searchTerm);
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= totalPages) {
+        setCurrentPage(page);
+        fetchTypeOfHealthFacilities(page, searchTerm);
+      }
+    },
+    [searchTerm, totalPages, fetchTypeOfHealthFacilities]
+  );
+
+  const getPaginationNumbers = () => {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
     }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, "...");
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    rangeWithDots.push(...range);
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push("...", totalPages);
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages);
+    }
+
+    return rangeWithDots;
   };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     } catch {
       return "-";
@@ -278,7 +373,8 @@ export default function TypeOfHealthFacilitiesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Building2 className="w-6 h-6" /> Type of Health Facilities Management
+              <ClipboardTypeIcon className="w-6 h-6" /> Type of Health
+              Facilities Management
             </h1>
             <p className="mt-1 text-sm text-gray-400">
               Manage types of health facilities in the system
@@ -321,6 +417,9 @@ export default function TypeOfHealthFacilitiesPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  No
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Facility Type Name
                 </th>
@@ -339,60 +438,66 @@ export default function TypeOfHealthFacilitiesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {Array.isArray(typeOfHealthFacilities) && typeOfHealthFacilities.map((facility) => (
-                <tr key={facility.id} className="hover:bg-gray-800">
-                  <td className="px-6 py-4 text-white font-medium">
-                    {facility.name || ""}
-                  </td>
-                  <td className="px-6 py-4 text-gray-300">
-                    <code className="px-2 py-1 bg-gray-700 rounded text-sm">
-                      {facility.slug || ""}
-                    </code>
-                  </td>
-                  <td className="px-6 py-4 text-gray-300 text-sm">
-                    {facility.description || "-"}
-                  </td>
-                  <td className="px-6 py-4 text-gray-400 text-sm">
-                    {formatDate(facility.created_at)}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {hasPermission("show-type-of-health-facility") && (
+              {Array.isArray(typeOfHealthFacilities) &&
+                typeOfHealthFacilities.map((facility, index) => (
+                  <tr key={facility.id} className="hover:bg-gray-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                      {(currentPage - 1) * perPage + index + 1}
+                    </td>
+                    <td className="px-6 py-4 text-white font-medium">
+                      {facility.name || ""}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300">
+                      <code className="px-2 py-1 bg-gray-700 rounded text-sm">
+                        {facility.slug || ""}
+                      </code>
+                    </td>
+                    <td className="px-6 py-4 text-gray-300 text-sm">
+                      {facility.description || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-400 text-sm">
+                      {formatDate(facility.created_at)}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* {hasPermission("show-type-of-health-facility") && (
                         <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
                           <Eye className="w-4 h-4" />
                         </button>
-                      )}
-                      {hasPermission("update-type-of-health-facility") && (
-                        <button
-                          onClick={() => handleEdit(facility)}
-                          className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      )}
-                      {hasPermission("delete-type-of-health-facility") && (
-                        <button
-                          onClick={() => handleDelete(facility.slug)}
-                          className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      )} */}
+                        {hasPermission("update-type-of-health-facility") && (
+                          <button
+                            onClick={() => handleEdit(facility)}
+                            className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission("delete-type-of-health-facility") && (
+                          <button
+                            onClick={() => handleDelete(facility.slug)}
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
 
-              {(!Array.isArray(typeOfHealthFacilities) || typeOfHealthFacilities.length === 0) && !loading && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No type of health facilities found.
-                  </td>
-                </tr>
-              )}
+              {(!Array.isArray(typeOfHealthFacilities) ||
+                typeOfHealthFacilities.length === 0) &&
+                !loading && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-6 py-8 text-center text-gray-500"
+                    >
+                      No type of health facilities found.
+                    </td>
+                  </tr>
+                )}
             </tbody>
           </table>
 
@@ -405,39 +510,74 @@ export default function TypeOfHealthFacilitiesPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center space-x-2">
-            {[...Array(totalPages)].map((_, i) => {
-              const page = i + 1;
-              return (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`px-4 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
-                    currentPage === page
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-gray-600 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            })}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-gray-400">
+            Showing {(currentPage - 1) * perPage + 1} to{" "}
+            {Math.min(currentPage * perPage, totalTypeOfFacility)} of {totalTypeOfFacility}{" "}
+            results
           </div>
-        )}
+
+          <div className="flex items-center space-x-1">
+            {/* Previous button */}
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              Previous
+            </button>
+
+            {/* Page numbers */}
+            {getPaginationNumbers().map((page, index) => (
+              <div key={index}>
+                {page === "..." ? (
+                  <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
+                      currentPage === page
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {/* Next button */}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       </div>
-      
+
       {/* Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[90%] max-w-lg -translate-x-1/2 -translate-y-1/2">
             <Dialog.Title className="text-xl font-bold mb-4">
-              {formData.id ? "Edit Type of Health Facility" : "Add Type of Health Facility"}
+              {formData.id
+                ? "Edit Type of Health Facility"
+                : "Add Type of Health Facility"}
             </Dialog.Title>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Facility Type Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  Facility Type Name
+                </label>
                 <input
                   type="text"
                   value={formData.name}
@@ -466,7 +606,9 @@ export default function TypeOfHealthFacilitiesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+                <label className="block text-sm font-medium mb-1">
+                  Description (Optional)
+                </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) =>
@@ -480,18 +622,32 @@ export default function TypeOfHealthFacilitiesPage() {
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
+              {/* Cancel Button */}
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"
+                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer flex items-center gap-2"
               >
+                <X className="w-4 h-4" />
                 Cancel
               </button>
+
+              {/* Create/Update Button */}
               <button
                 onClick={handleSubmit}
                 disabled={!formData.name.trim()}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
               >
-                {formData.id ? "Update" : "Create"}
+                {formData.id ? (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Update
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Create
+                  </>
+                )}
               </button>
             </div>
           </Dialog.Content>

@@ -2,11 +2,20 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { Edit, Trash2, Key, Plus, Search, Save, X } from "lucide-react";
+import {
+  Edit,
+  Trash2,
+  Plus,
+  Search,
+  X,
+  Save,
+  PlusIcon,
+  MonitorCog,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 
-interface Permission {
+interface MedicalDeviceCategory {
   id: number;
   name: string;
   slug: string;
@@ -15,21 +24,21 @@ interface Permission {
   updated_at: string;
 }
 
-interface FormPermission {
+interface FormMedicalDeviceCategory {
   id?: number;
   name: string;
   slug: string;
   description: string;
 }
 
-export default function PermissionsPage() {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+export default function MedicalDeviceCategoriesPage() {
+  const [categories, setCategories] = useState<MedicalDeviceCategory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalPermission, setTotalPermission] = useState(0);
+  const [totalMdCategory, setTotalMdCategory] = useState(0);
   const [perPage, setPerPage] = useState(10);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -37,7 +46,7 @@ export default function PermissionsPage() {
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<FormPermission>({
+  const [formData, setFormData] = useState<FormMedicalDeviceCategory>({
     name: "",
     slug: "",
     description: "",
@@ -45,7 +54,7 @@ export default function PermissionsPage() {
 
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchPermissions = async (page: number = 1, search: string = "") => {
+  const fetchCategories = async (page: number = 1, search: string = "") => {
     try {
       setLoading(true);
       setError(null);
@@ -57,59 +66,259 @@ export default function PermissionsPage() {
       if (search.trim()) params.append("search", search);
 
       const res = await fetch(
-        `http://report-api.test/api/permission-with-pagination?${params.toString()}`,
+        `http://report-api.test/api/medical-device-category?${params.toString()}`,
         {
-          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
             Accept: "application/json",
           },
         }
       );
 
-      if (!res.ok) throw new Error("Failed to fetch permissions");
+      if (!res.ok) throw new Error("Failed to fetch medical device categories");
       const json = await res.json();
 
       // Safe data handling dengan default values
-      const permissionsData = Array.isArray(json.data)
-        ? json.data.map((p: Partial<Permission>) => ({
-            id: p.id || 0,
-            name: p.name || "",
-            slug: p.slug || "",
-            description: p.description || "",
-            created_at: p.created_at || "",
-            updated_at: p.updated_at || "",
+      const categoriesData = Array.isArray(json.data)
+        ? json.data.map((c: Partial<MedicalDeviceCategory>) => ({
+            id: c.id || 0,
+            name: c.name || "",
+            slug: c.slug || "",
+            description: c.description || "",
+            created_at: c.created_at || "",
+            updated_at: c.updated_at || "",
           }))
         : [];
 
-      setPermissions(permissionsData);
-      setCurrentPage(json.meta?.current_page || 1);
+      setCategories(categoriesData);
+      setCurrentPage(json.meta.current_page);
       setTotalPages(json.meta.last_page);
-      setTotalPermission(json.meta.total);
+      setTotalMdCategory(json.meta.total);
       setPerPage(json.meta.per_page);
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Error fetching permissions"
+        err instanceof Error
+          ? err.message
+          : "Error fetching medical device categories"
       );
-      setPermissions([]); // Set empty array pada error
+      setCategories([]); // Set empty array pada error
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle pagination
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .trim();
+  };
+
+  const handleEdit = (category: MedicalDeviceCategory) => {
+    setFormData({
+      id: category.id,
+      name: category.name || "",
+      slug: category.slug || "",
+      description: category.description || "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setFormData({ name: "", slug: "", description: "" });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const token = Cookies.get("token");
+      if (!token) {
+        throw new Error("Token not found");
+      }
+
+      const method = formData.id ? "PUT" : "POST";
+      const url = formData.id
+        ? `http://report-api.test/api/medical-device-category/${formData.id}`
+        : "http://report-api.test/api/medical-device-category";
+
+      // Prepare JSON payload
+      const payload = {
+        name: formData.name,
+        slug: formData.slug || generateSlug(formData.name),
+        description: formData.description || null,
+      };
+
+      console.log("Submitting payload:", payload); // Debug log
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("Response status:", res.status); // Debug log
+
+      if (res.ok) {
+        setIsModalOpen(false);
+        setFormData({ name: "", slug: "", description: "" }); // Reset form
+        fetchCategories();
+        Swal.fire({
+          title: "Success",
+          text: "Medical device category has been saved",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          timerProgressBar: true,
+          background: "#1f2937",
+          color: "#F9FAFB",
+          customClass: {
+            popup: "rounded-xl p-6",
+          },
+        });
+      } else {
+        const errorData = await res.json();
+        console.error("Error response:", errorData); // Debug log
+
+        // Handle validation errors
+        if (errorData.errors) {
+          const errorMessages = Object.values(errorData.errors)
+            .flat()
+            .join("\n");
+          Swal.fire("Validation Error", errorMessages, "error");
+        } else {
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to save medical device category",
+            "error"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error saving medical device category:", error);
+      Swal.fire("Error", "Network error or server unavailable", "error");
+    }
+  };
+
+  const handleDelete = async (slug: string) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You will not be able to recover this medical device category!",
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("Token not found");
+        }
+
+        const res = await fetch(
+          `http://report-api.test/api/medical-device-category/${slug}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (res.ok) {
+          fetchCategories();
+          Swal.fire({
+            title: "Deleted!",
+            text: "Medical device category has been deleted.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        } else {
+          const errorData = await res.json();
+          Swal.fire(
+            "Error",
+            errorData.message || "Failed to delete medical device category",
+            "error"
+          );
+        }
+      } catch (error) {
+        console.error("Error deleting medical device category:", error);
+        Swal.fire("Error", "Failed to delete medical device category", "error");
+      }
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    const initializeData = async () => {
+      // Load permissions from cookies
+      const stored = Cookies.get("permissions");
+      if (stored) {
+        try {
+          setUserPermissions(JSON.parse(stored));
+        } catch {
+          setUserPermissions([]);
+        }
+      }
+
+      // Fetch data
+      await fetchCategories();
+    };
+
+    initializeData();
+  }, []);
+
+  // Search debounce
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      fetchCategories(1, searchTerm);
+    }, 400);
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [searchTerm]);
+
+  // Auto-generate slug when name changes
+  useEffect(() => {
+    if (formData.name) {
+      // Only auto-generate for new categories
+      setFormData((prev) => ({
+        ...prev,
+        slug: generateSlug(prev.name),
+      }));
+    }
+  }, [formData.name, formData.id]);
+
   const handlePageChange = useCallback(
     (page: number) => {
       if (page >= 1 && page <= totalPages) {
         setCurrentPage(page);
-        fetchPermissions(page, searchTerm);
+        fetchCategories(page, searchTerm);
       }
     },
-    [searchTerm, totalPages, fetchPermissions]
+    [searchTerm, totalPages, fetchCategories]
   );
 
-  // Generate pagination numbers
   const getPaginationNumbers = () => {
     const delta = 2;
     const range = [];
@@ -140,211 +349,6 @@ export default function PermissionsPage() {
     return rangeWithDots;
   };
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
-      .replace(/\s+/g, "-") // Replace spaces with hyphens
-      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
-      .trim();
-  };
-
-  const handleEdit = (permission: Permission) => {
-    setFormData({
-      id: permission.id,
-      name: permission.name || "",
-      slug: permission.slug || "",
-      description: permission.description || "",
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleAdd = () => {
-    setFormData({ name: "", slug: "", description: "" });
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const token = Cookies.get("token");
-      if (!token) {
-        throw new Error("Token not found");
-      }
-
-      const method = formData.id ? "PUT" : "POST";
-      const url = formData.id
-        ? `http://report-api.test/api/permission/${formData.id}`
-        : "http://report-api.test/api/permission";
-
-      // Prepare JSON payload
-      const payload = {
-        name: formData.name,
-        slug: formData.slug || generateSlug(formData.name),
-        description: formData.description || null,
-      };
-
-      console.log("Submitting payload:", payload); // Debug log
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      console.log("Response status:", res.status); // Debug log
-
-      if (res.ok) {
-        setIsModalOpen(false);
-        setFormData({ name: "", slug: "", description: "" }); // Reset form
-        fetchPermissions();
-        Swal.fire({
-          title: "Success",
-          text: "Permission has been saved",
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-          timerProgressBar: true,
-          background: "#1f2937",
-          color: "#F9FAFB",
-          customClass: {
-            popup: "rounded-xl p-6",
-          },
-        });
-      } else {
-        const errorData = await res.json();
-        console.error("Error response:", errorData); // Debug log
-
-        // Handle validation errors
-        if (errorData.errors) {
-          const errorMessages = Object.values(errorData.errors)
-            .flat()
-            .join("\n");
-          Swal.fire("Validation Error", errorMessages, "error");
-        } else {
-          Swal.fire(
-            "Error",
-            errorData.message || "Failed to save permission",
-            "error"
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Error saving permission:", error);
-      Swal.fire("Error", "Network error or server unavailable", "error");
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "You will not be able to recover this permission!",
-      icon: "warning",
-      showCancelButton: true,
-      background: "#111827",
-      color: "#F9FAFB",
-      customClass: {
-        popup: "rounded-xl",
-      },
-      confirmButtonText: "Yes, delete it!",
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const token = Cookies.get("token");
-        if (!token) {
-          throw new Error("Token not found");
-        }
-
-        const res = await fetch(`http://report-api.test/api/permission/${id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-
-        if (res.ok) {
-          fetchPermissions();
-          Swal.fire({
-            title: "Deleted!",
-            text: "Permission has been deleted.",
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-            timerProgressBar: true,
-            background: "#1f2937",
-            color: "#F9FAFB",
-            customClass: {
-              popup: "rounded-xl p-6",
-            },
-          });
-        } else {
-          const errorData = await res.json();
-          Swal.fire(
-            "Error",
-            errorData.message || "Failed to delete permission",
-            "error"
-          );
-        }
-      } catch (error) {
-        console.error("Error deleting permission:", error);
-        Swal.fire("Error", "Failed to delete permission", "error");
-      }
-    }
-  };
-
-  // Initial load
-  useEffect(() => {
-    const initializeData = async () => {
-      // Load permissions from cookies
-      const stored = Cookies.get("permissions");
-      if (stored) {
-        try {
-          setUserPermissions(JSON.parse(stored));
-        } catch {
-          setUserPermissions([]);
-        }
-      }
-
-      // Fetch data
-      await fetchPermissions();
-    };
-
-    initializeData();
-  }, []);
-
-  // Search debounce
-  useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      fetchPermissions(1, searchTerm);
-    }, 400);
-    return () => {
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    };
-  }, [searchTerm]);
-
-  // Auto-generate slug when name changes
-  useEffect(() => {
-    if (formData.name) {
-      // Only auto-generate for new permissions
-      setFormData((prev) => ({
-        ...prev,
-        slug: generateSlug(prev.name),
-      }));
-    }
-  }, [formData.name, formData.id]);
-
-  // const handlePageChange = (page: number) => {
-  //   if (page >= 1 && page <= totalPages) {
-  //     fetchPermissions(page, searchTerm);
-  //   }
-  // };
-
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     try {
@@ -365,19 +369,19 @@ export default function PermissionsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Key className="w-6 h-6" /> Permissions Management
+              <MonitorCog className="w-6 h-6" /> Medical Device Categories
             </h1>
             <p className="mt-1 text-sm text-gray-400">
-              Manage system permissions and access controls
+              Manage medical device categories and classifications
             </p>
           </div>
 
-          {hasPermission("create-permissions") && (
+          {hasPermission("create-medical-device-category") && (
             <button
               onClick={handleAdd}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4 mr-2" /> Add Permission
+              <Plus className="w-4 h-4 mr-2" /> Add Category
             </button>
           )}
         </div>
@@ -388,7 +392,7 @@ export default function PermissionsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search permissions by name or slug..."
+              placeholder="Search categories by name or slug..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
@@ -412,7 +416,7 @@ export default function PermissionsPage() {
                   No
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Permission Name
+                  Category Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Slug
@@ -429,44 +433,44 @@ export default function PermissionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {Array.isArray(permissions) &&
-                permissions.map((permission, index) => (
-                  <tr key={permission.id} className="hover:bg-gray-800">
+              {Array.isArray(categories) &&
+                categories.map((category, index) => (
+                  <tr key={category.id} className="hover:bg-gray-800">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
                     <td className="px-6 py-4 text-white font-medium">
-                      {permission.name || ""}
+                      {category.name || ""}
                     </td>
                     <td className="px-6 py-4 text-gray-300">
                       <code className="px-2 py-1 bg-gray-700 rounded text-sm">
-                        {permission.slug || ""}
+                        {category.slug || ""}
                       </code>
                     </td>
                     <td className="px-6 py-4 text-gray-300 text-sm">
-                      {permission.description || "-"}
+                      {category.description || "-"}
                     </td>
                     <td className="px-6 py-4 text-gray-400 text-sm">
-                      {formatDate(permission.created_at)}
+                      {formatDate(category.created_at)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* {hasPermission("show-permissions") && (
-                        <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )} */}
-                        {hasPermission("update-permissions") && (
+                        {/* {hasPermission("show-medical-device-category") && (
+                          <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )} */}
+                        {hasPermission("update-medical-device-category") && (
                           <button
-                            onClick={() => handleEdit(permission)}
+                            onClick={() => handleEdit(category)}
                             className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                         )}
-                        {hasPermission("delete-permissions") && (
+                        {hasPermission("delete-medical-device-category") && (
                           <button
-                            onClick={() => handleDelete(permission.id)}
+                            onClick={() => handleDelete(category.slug)}
                             className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -477,14 +481,14 @@ export default function PermissionsPage() {
                   </tr>
                 ))}
 
-              {(!Array.isArray(permissions) || permissions.length === 0) &&
+              {(!Array.isArray(categories) || categories.length === 0) &&
                 !loading && (
                   <tr>
                     <td
                       colSpan={6}
                       className="px-6 py-8 text-center text-gray-500"
                     >
-                      No permissions found.
+                      No medical device categories found.
                     </td>
                   </tr>
                 )}
@@ -493,7 +497,7 @@ export default function PermissionsPage() {
 
           {loading && (
             <div className="py-8 text-center text-gray-400">
-              Loading permissions...
+              Loading medical device categories...
             </div>
           )}
         </div>
@@ -503,8 +507,8 @@ export default function PermissionsPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-400">
               Showing {(currentPage - 1) * perPage + 1} to{" "}
-              {Math.min(currentPage * perPage, totalPermission)} of{" "}
-              {totalPermission} results
+              {Math.min(currentPage * perPage, totalMdCategory)} of{" "}
+              {totalMdCategory} results
             </div>
 
             <div className="flex items-center space-x-1">
@@ -558,13 +562,15 @@ export default function PermissionsPage() {
           <Dialog.Overlay className="fixed inset-0 bg-black/50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[90%] max-w-lg -translate-x-1/2 -translate-y-1/2">
             <Dialog.Title className="text-xl font-bold mb-4">
-              {formData.id ? "Edit Permission" : "Add Permission"}
+              {formData.id
+                ? "Edit Medical Device Category"
+                : "Add Medical Device Category"}
             </Dialog.Title>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Permission Name
+                  Category Name
                 </label>
                 <input
                   type="text"
@@ -572,7 +578,7 @@ export default function PermissionsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="e.g., Create Users"
+                  placeholder="e.g., HEMATOLOGI"
                   className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -585,7 +591,7 @@ export default function PermissionsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, slug: e.target.value })
                   }
-                  placeholder="e.g., create-users"
+                  placeholder="e.g., hematologi"
                   className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-400 mt-1">
@@ -602,7 +608,7 @@ export default function PermissionsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Brief description of this permission"
+                  placeholder="Brief description of this category"
                   rows={3}
                   className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
@@ -612,24 +618,24 @@ export default function PermissionsPage() {
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer flex items-center gap-2"
+                className="flex items-center gap-2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X size={16} />
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={!formData.name.trim()}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                className="flex items-center gap-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {formData.id ? (
                   <>
-                    <Save className="w-4 h-4" />
+                    <Save size={16} />
                     Update
                   </>
                 ) : (
                   <>
-                    <Plus className="w-4 h-4" />
+                    <PlusIcon size={16} />
                     Create
                   </>
                 )}

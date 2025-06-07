@@ -1,10 +1,10 @@
 
 import PermissionGuard from "@/components/PermissionGuard";
-import HealthFacilitiesPage from "./healthFacilities";
+import HealthFacilitiesPage from "./healthFacilitiesPage";
 
 export default function Page() {
   return (
-    <PermissionGuard permissions={["view-permissions", "create-permissions", "update-permissions", "delete-permissions", "show-permissions"]}>
+    <PermissionGuard permissions={["view-health-facility", "create-health-facility", "update-health-facility", "delete-health-facility", "show-health-facility"]}>
       <HealthFacilitiesPage />
     </PermissionGuard>
   );
