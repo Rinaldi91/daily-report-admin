@@ -42,56 +42,63 @@ export default function PositionsPage() {
     description: "",
   });
 
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchPositions = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
+  const fetchPositions = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
 
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
 
-      const res = await fetch(
-        `http://report-api.test/api/position?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
+        const res = await fetch(
+          `http://report-api.test/api/position?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
-      if (!res.ok) throw new Error("Failed to fetch positions");
-      const json = await res.json();
+        if (!res.ok) throw new Error("Failed to fetch positions");
+        const json = await res.json();
 
-      // Safe data handling dengan default values
-      const positionsData = Array.isArray(json.data)
-        ? json.data.map((p: Partial<Position>) => ({
-            id: p.id || 0,
-            name: p.name || "",
-            slug: p.slug || "",
-            description: p.description || "",
-            created_at: p.created_at || "",
-            updated_at: p.updated_at || "",
-          }))
-        : [];
+        const positionsData = Array.isArray(json.data)
+          ? json.data.map((p: Partial<Position>) => ({
+              id: p.id || 0,
+              name: p.name || "",
+              slug: p.slug || "",
+              description: p.description || "",
+              created_at: p.created_at || "",
+              updated_at: p.updated_at || "",
+            }))
+          : [];
 
-      setPositions(positionsData);
-      setCurrentPage(json.meta.current_page);
-      setTotalPages(json.meta.last_page);
-      setTotalPosition(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error fetching positions");
-      setPositions([]); // Set empty array pada error
-    } finally {
-      setLoading(false);
-    }
-  };
+        setPositions(positionsData);
+        setCurrentPage(json.meta.current_page);
+        setTotalPages(json.meta.last_page);
+        setTotalPosition(json.meta.total);
+        setPerPage(json.meta.per_page);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Error fetching positions"
+        );
+        setPositions([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [] // tambahkan dependency jika perlu seperti token tetap
+  );
 
   const generateSlug = (name: string) => {
     return name
@@ -250,6 +257,126 @@ export default function PositionsPage() {
     }
   };
 
+  // Multi-delete functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(positions.map((item) => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleMultiDelete = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedPositions = positions.filter((cat) =>
+      selectedItems.has(cat.id)
+    );
+    const positionNames = selectedPositions.map((cat) => cat.name).join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Positions?",
+      html: `
+            <p>You are about to delete <strong>${selectedItems.size}</strong> position:</p>
+            <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${positionNames}</p>
+            <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+          `,
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("Token not found");
+        }
+
+        const deletePromises = selectedPositions.map((item) =>
+          fetch(`http://report-api.test/api/position/${item.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          })
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        // Count successful deletions
+        const successCount = results.filter(
+          (result) => result.status === "fulfilled" && result.value.ok
+        ).length;
+
+        const failedCount = selectedItems.size - successCount;
+
+        // Refresh data
+        await fetchPositions();
+
+        // Show result
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} position.`,
+            icon: "success",
+            timer: 3000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} position successfully. ${failedCount} failed to delete.`,
+            icon: "warning",
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error in multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to delete position. Please try again.",
+          icon: "error",
+          background: "#1f2937",
+          color: "#F9FAFB",
+        });
+      } finally {
+        setIsDeleting(false);
+        setSelectedItems(new Set());
+      }
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const initializeData = async () => {
@@ -268,7 +395,7 @@ export default function PositionsPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchPositions]);
 
   // Search debounce
   useEffect(() => {
@@ -279,7 +406,7 @@ export default function PositionsPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchPositions]);
 
   // Auto-generate slug when name changes
   useEffect(() => {
@@ -347,6 +474,10 @@ export default function PositionsPage() {
     }
   };
 
+  const isAllSelected =
+    positions.length > 0 && positions.every((cat) => selectedItems.has(cat.id));
+  const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
+
   return (
     <>
       <div className="space-y-6">
@@ -361,14 +492,29 @@ export default function PositionsPage() {
             </p>
           </div>
 
-          {hasPermission("create-position") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Position
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedItems.size > 0 && hasPermission("delete-position") && (
+              <button
+                onClick={handleMultiDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {isDeleting
+                  ? "Deleting..."
+                  : `Delete ${selectedItems.size} Items`}
+              </button>
+            )}
+
+            {hasPermission("create-position") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Position
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -377,13 +523,34 @@ export default function PositionsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search positions by name or slug..."
+              placeholder="Search positions by name ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
+              className="w-full pl-10 pr-10 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
         </div>
+
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-300 text-sm">
+              {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -397,6 +564,19 @@ export default function PositionsPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                {hasPermission("delete-position") && (
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   No
                 </th>
@@ -421,6 +601,18 @@ export default function PositionsPage() {
               {Array.isArray(positions) &&
                 positions.map((position, index) => (
                   <tr key={position.id} className="hover:bg-gray-800">
+                    {hasPermission("delete-position") && (
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(position.id)}
+                          onChange={(e) =>
+                            handleSelectItem(position.id, e.target.checked)
+                          }
+                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
@@ -465,20 +657,21 @@ export default function PositionsPage() {
                     </td>
                   </tr>
                 ))}
-
-              {(!Array.isArray(positions) || positions.length === 0) &&
-                !loading && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No positions found.
-                    </td>
-                  </tr>
-                )}
             </tbody>
           </table>
+
+          {positions.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No positions found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">
@@ -489,56 +682,56 @@ export default function PositionsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-gray-400">
-            Showing {(currentPage - 1) * perPage + 1} to{" "}
-            {Math.min(currentPage * perPage, totalPosition)} of {totalPosition}{" "}
-            results
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-400">
+              Showing {(currentPage - 1) * perPage + 1} to{" "}
+              {Math.min(currentPage * perPage, totalPosition)} of{" "}
+              {totalPosition} results
+            </div>
+
+            <div className="flex items-center space-x-1">
+              {/* Previous button */}
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              {getPaginationNumbers().map((page, index) => (
+                <div key={index}>
+                  {page === "..." ? (
+                    <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handlePageChange(page as number)}
+                      className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Next button */}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
-
-          <div className="flex items-center space-x-1">
-            {/* Previous button */}
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
-            >
-              Previous
-            </button>
-
-            {/* Page numbers */}
-            {getPaginationNumbers().map((page, index) => (
-              <div key={index}>
-                {page === "..." ? (
-                  <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handlePageChange(page as number)}
-                    className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
-                      currentPage === page
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "border-gray-600 text-gray-300 hover:bg-gray-700"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {/* Next button */}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* Modal */}

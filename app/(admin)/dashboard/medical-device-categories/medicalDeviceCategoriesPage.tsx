@@ -52,60 +52,78 @@ export default function MedicalDeviceCategoriesPage() {
     description: "",
   });
 
-  const hasPermission = (slug: string) => userPermissions.includes(slug);
+  // Multi-delete state
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchCategories = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
-
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
-
-      const res = await fetch(
-        `http://report-api.test/api/medical-device-category?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch medical device categories");
-      const json = await res.json();
-
-      // Safe data handling dengan default values
-      const categoriesData = Array.isArray(json.data)
-        ? json.data.map((c: Partial<MedicalDeviceCategory>) => ({
-            id: c.id || 0,
-            name: c.name || "",
-            slug: c.slug || "",
-            description: c.description || "",
-            created_at: c.created_at || "",
-            updated_at: c.updated_at || "",
-          }))
-        : [];
-
-      setCategories(categoriesData);
-      setCurrentPage(json.meta.current_page);
-      setTotalPages(json.meta.last_page);
-      setTotalMdCategory(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Error fetching medical device categories"
-      );
-      setCategories([]); // Set empty array pada error
-    } finally {
-      setLoading(false);
+  // const hasPermission = (slug: string) => userPermissions.includes(slug);
+  const hasPermission = (slugs: string | string[]): boolean => {
+    // Jika input adalah string (single slug)
+    if (typeof slugs === "string") {
+      return userPermissions.includes(slugs);
     }
+
+    // Jika input adalah array (multiple slugs)
+    // Return true jika user memiliki SALAH SATU dari permission yang diminta
+    return slugs.some((slug) => userPermissions.includes(slug));
   };
+
+  const fetchCategories = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
+
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
+
+        const res = await fetch(
+          `http://report-api.test/api/medical-device-category?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!res.ok)
+          throw new Error("Failed to fetch medical device categories");
+        const json = await res.json();
+
+        const categoriesData = Array.isArray(json.data)
+          ? json.data.map((c: Partial<MedicalDeviceCategory>) => ({
+              id: c.id || 0,
+              name: c.name || "",
+              slug: c.slug || "",
+              description: c.description || "",
+              created_at: c.created_at || "",
+              updated_at: c.updated_at || "",
+            }))
+          : [];
+
+        setCategories(categoriesData);
+        setCurrentPage(json.meta.current_page);
+        setTotalPages(json.meta.last_page);
+        setTotalMdCategory(json.meta.total);
+        setPerPage(json.meta.per_page);
+        setSelectedItems(new Set());
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error fetching medical device categories"
+        );
+        setCategories([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   const generateSlug = (name: string) => {
     return name
@@ -267,6 +285,129 @@ export default function MedicalDeviceCategoriesPage() {
     }
   };
 
+  // Multi-delete functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(categories.map((category) => category.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleMultiDelete = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedCategories = categories.filter((cat) =>
+      selectedItems.has(cat.id)
+    );
+    const categoryNames = selectedCategories.map((cat) => cat.name).join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Categories?",
+      html: `
+        <p>You are about to delete <strong>${selectedItems.size}</strong> categories:</p>
+        <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${categoryNames}</p>
+        <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("Token not found");
+        }
+
+        const deletePromises = selectedCategories.map((category) =>
+          fetch(
+            `http://report-api.test/api/medical-device-category/${category.slug}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          )
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        // Count successful deletions
+        const successCount = results.filter(
+          (result) => result.status === "fulfilled" && result.value.ok
+        ).length;
+
+        const failedCount = selectedItems.size - successCount;
+
+        // Refresh data
+        await fetchCategories();
+
+        // Show result
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} categories.`,
+            icon: "success",
+            timer: 3000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} categories successfully. ${failedCount} failed to delete.`,
+            icon: "warning",
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error in multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to delete categories. Please try again.",
+          icon: "error",
+          background: "#1f2937",
+          color: "#F9FAFB",
+        });
+      } finally {
+        setIsDeleting(false);
+        setSelectedItems(new Set());
+      }
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const initializeData = async () => {
@@ -285,7 +426,7 @@ export default function MedicalDeviceCategoriesPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchCategories]);
 
   // Search debounce
   useEffect(() => {
@@ -296,7 +437,7 @@ export default function MedicalDeviceCategoriesPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchCategories]);
 
   // Auto-generate slug when name changes
   useEffect(() => {
@@ -362,6 +503,12 @@ export default function MedicalDeviceCategoriesPage() {
     }
   };
 
+  // Check if all visible items are selected
+  const isAllSelected =
+    categories.length > 0 &&
+    categories.every((cat) => selectedItems.has(cat.id));
+  const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
+
   return (
     <>
       <div className="space-y-6">
@@ -376,14 +523,31 @@ export default function MedicalDeviceCategoriesPage() {
             </p>
           </div>
 
-          {hasPermission("create-medical-device-category") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Category
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Multi-delete button */}
+            {selectedItems.size > 0 &&
+              hasPermission("delete-medical-device-category") && (
+                <button
+                  onClick={handleMultiDelete}
+                  disabled={isDeleting}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {isDeleting
+                    ? "Deleting..."
+                    : `Delete ${selectedItems.size} Items`}
+                </button>
+              )}
+
+            {hasPermission("create-medical-device-category") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Category
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -392,13 +556,35 @@ export default function MedicalDeviceCategoriesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search categories by name or slug..."
+              placeholder="Search medical device categories by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
         </div>
+
+        {/* Selection info */}
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-300 text-sm">
+              {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -412,6 +598,19 @@ export default function MedicalDeviceCategoriesPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                {hasPermission("delete-medical-device-category") && (
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   No
                 </th>
@@ -427,15 +626,32 @@ export default function MedicalDeviceCategoriesPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
-                  Actions
-                </th>
+                {hasPermission([
+                  "update-medical-device-category",
+                  "delete-medical-device-category",
+                ]) && (
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {Array.isArray(categories) &&
                 categories.map((category, index) => (
                   <tr key={category.id} className="hover:bg-gray-800">
+                    {hasPermission("delete-medical-device-category") && (
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(category.id)}
+                          onChange={(e) =>
+                            handleSelectItem(category.id, e.target.checked)
+                          }
+                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
@@ -453,47 +669,48 @@ export default function MedicalDeviceCategoriesPage() {
                     <td className="px-6 py-4 text-gray-400 text-sm">
                       {formatDate(category.created_at)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* {hasPermission("show-medical-device-category") && (
-                          <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        )} */}
-                        {hasPermission("update-medical-device-category") && (
-                          <button
-                            onClick={() => handleEdit(category)}
-                            className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                        {hasPermission("delete-medical-device-category") && (
-                          <button
-                            onClick={() => handleDelete(category.slug)}
-                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {hasPermission([
+                      "update-medical-device-category",
+                      "delete-medical-device-category",
+                    ]) && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {hasPermission("update-medical-device-category") && (
+                            <button
+                              onClick={() => handleEdit(category)}
+                              className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {hasPermission("delete-medical-device-category") && (
+                            <button
+                              onClick={() => handleDelete(category.slug)}
+                              className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
-
-              {(!Array.isArray(categories) || categories.length === 0) &&
-                !loading && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No medical device categories found.
-                    </td>
-                  </tr>
-                )}
             </tbody>
           </table>
+
+          {categories.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No medical device categories found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">

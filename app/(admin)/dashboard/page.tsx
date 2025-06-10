@@ -265,13 +265,11 @@ export default function DashboardPage() {
   // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-white text-lg">Loading dashboard...</div>
-          <div className="text-white/60 text-sm mt-2">
-            Fetching data...
-          </div>
+          <div className="text-white/60 text-sm mt-2">Fetching data...</div>
         </div>
       </div>
     );

@@ -65,6 +65,12 @@ export default function MedicalDevicesPage() {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  // Multi-delete states
+  const [selectedDevices, setSelectedDevices] = useState<Set<number>>(
+    new Set()
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<FormMedicalDevice>({
     medical_device_category_id: "",
@@ -114,57 +120,178 @@ export default function MedicalDevicesPage() {
     }
   };
 
-  const fetchMedicalDevices = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
+  const fetchMedicalDevices = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
 
-      const res = await fetch(
-        `http://report-api.test/api/medical-device?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
+
+        const res = await fetch(
+          `http://report-api.test/api/medical-device?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch medical devices");
+
+        const json = await res.json();
+
+        const devicesData = Array.isArray(json.data)
+          ? json.data.map((d: Partial<MedicalDevice>) => ({
+              id: d.id || 0,
+              medical_device_category_id: d.medical_device_category_id || 0,
+              brand: d.brand || "",
+              model: d.model || "",
+              serial_number: d.serial_number || "",
+              software_version: d.software_version || null,
+              status: d.status || "",
+              notes: d.notes || null,
+              created_at: d.created_at || "",
+              updated_at: d.updated_at || "",
+            }))
+          : [];
+
+        setMedicalDevices(devicesData);
+        setCurrentPage(json.meta?.current_page || 1);
+        setTotalPages(json.meta?.last_page || 1);
+        setTotalMedicalDevice(json.meta?.total || 0);
+        setPerPage(json.meta?.per_page || 10);
+
+        setSelectedDevices(new Set());
+      } catch (err: unknown) {
+        console.error("Fetch error:", err);
+        setError(
+          err instanceof Error ? err.message : "Error fetching medical devices"
+        );
+        setMedicalDevices([]);
+        setSelectedDevices(new Set());
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Handle individual checkbox selection
+  const handleDeviceSelect = (id: number) => {
+    const newSelected = new Set(selectedDevices);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedDevices(newSelected);
+  };
+
+  // Handle select all checkbox
+  const handleSelectAll = () => {
+    if (selectedDevices.size === medicalDevices.length) {
+      setSelectedDevices(new Set());
+    } else {
+      setSelectedDevices(new Set(medicalDevices.map((d) => d.id)));
+    }
+  };
+
+  // Multi-delete function
+  const handleMultiDelete = async () => {
+    if (selectedDevices.size === 0) return;
+
+    const selectedList = medicalDevices.filter((d) =>
+      selectedDevices.has(d.id)
+    );
+    const deviceLabels = selectedList
+      .map((d) => `${d.brand} ${d.model}`)
+      .join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Devices?",
+      html: `
+      <p>You are about to delete <strong>${selectedDevices.size}</strong> devices:</p>
+      <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${deviceLabels}</p>
+      <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+    `,
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Token not found");
+
+        const deletePromises = selectedList.map((device) =>
+          fetch(`http://report-api.test/api/medical-device/${device.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          })
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        const successCount = results.filter(
+          (r) => r.status === "fulfilled" && r.value.ok
+        ).length;
+
+        const failedCount = selectedDevices.size - successCount;
+
+        await fetchMedicalDevices(currentPage, searchTerm);
+        setSelectedDevices(new Set());
+
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} devices.`,
+            icon: "success",
+            timer: 3000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} devices successfully. ${failedCount} failed to delete.`,
+            icon: "warning",
+            background: "#1f2937",
+            color: "#F9FAFB",
+          });
         }
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch medical devices");
-      const json = await res.json();
-
-      const devicesData = Array.isArray(json.data)
-        ? json.data.map((d: Partial<MedicalDevice>) => ({
-            id: d.id || 0,
-            medical_device_category_id: d.medical_device_category_id || 0,
-            brand: d.brand || "",
-            model: d.model || "",
-            serial_number: d.serial_number || "",
-            software_version: d.software_version || null,
-            status: d.status || "",
-            notes: d.notes || null,
-            created_at: d.created_at || "",
-            updated_at: d.updated_at || "",
-          }))
-        : [];
-
-      setMedicalDevices(devicesData);
-      setCurrentPage(json.meta?.current_page || 1);
-      setTotalPages(json.meta.last_page);
-      setTotalMedicalDevice(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Error fetching medical devices"
-      );
-      setMedicalDevices([]);
-    } finally {
-      setLoading(false);
+      } catch (error) {
+        console.error("Error during multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to delete devices. Please try again.",
+          icon: "error",
+          background: "#1f2937",
+          color: "#F9FAFB",
+        });
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -244,7 +371,7 @@ export default function MedicalDevicesPage() {
           status: "",
           notes: "",
         });
-        fetchMedicalDevices();
+        fetchMedicalDevices(currentPage, searchTerm);
         Swal.fire({
           title: "Success",
           text: "Medical device has been saved",
@@ -314,7 +441,7 @@ export default function MedicalDevicesPage() {
         );
 
         if (res.ok) {
-          fetchMedicalDevices();
+          fetchMedicalDevices(currentPage, searchTerm);
           Swal.fire({
             title: "Deleted!",
             text: "Medical device has been deleted.",
@@ -388,7 +515,7 @@ export default function MedicalDevicesPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchMedicalDevices]);
 
   // Search debounce
   useEffect(() => {
@@ -399,7 +526,7 @@ export default function MedicalDevicesPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchMedicalDevices]);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -469,14 +596,31 @@ export default function MedicalDevicesPage() {
             </p>
           </div>
 
-          {hasPermission("create-medical-device") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Medical Device
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Multi-delete button */}
+            {hasPermission("delete-medical-device") &&
+              selectedDevices.size > 0 && (
+                <button
+                  onClick={handleMultiDelete}
+                  disabled={isDeleting}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {isDeleting
+                    ? "Deleting..."
+                    : `Delete ${selectedDevices.size} Items`}
+                </button>
+              )}
+
+            {hasPermission("create-medical-device") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Medical Device
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -490,8 +634,30 @@ export default function MedicalDevicesPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
         </div>
+
+        {/* Selection Info */}
+        {selectedDevices.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mt-4">
+            <p className="text-blue-300 text-sm">
+              {selectedDevices.size} item{selectedDevices.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedDevices(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -506,6 +672,26 @@ export default function MedicalDevicesPage() {
             <table className="w-full">
               <thead className="bg-gray-800 text-white">
                 <tr>
+                  {hasPermission("delete-medical-device") && (
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={
+                          medicalDevices.length > 0 &&
+                          selectedDevices.size === medicalDevices.length
+                        }
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              selectedDevices.size > 0 &&
+                              selectedDevices.size < medicalDevices.length;
+                          }
+                        }}
+                        onChange={() => handleSelectAll()}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                     No
                   </th>
@@ -536,6 +722,16 @@ export default function MedicalDevicesPage() {
                 {Array.isArray(medicalDevices) &&
                   medicalDevices.map((device, index) => (
                     <tr key={device.id} className="hover:bg-gray-800">
+                      {hasPermission("delete-medical-device") && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedDevices.has(device.id)}
+                            onChange={() => handleDeviceSelect(device.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {(currentPage - 1) * perPage + index + 1}
                       </td>
@@ -577,11 +773,6 @@ export default function MedicalDevicesPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* {hasPermission("view-medical-device") && (
-                            <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          )} */}
                           {hasPermission("update-medical-device") && (
                             <button
                               onClick={() => handleEdit(device)}
@@ -602,22 +793,22 @@ export default function MedicalDevicesPage() {
                       </td>
                     </tr>
                   ))}
-
-                {(!Array.isArray(medicalDevices) ||
-                  medicalDevices.length === 0) &&
-                  !loading && (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="px-6 py-8 text-center text-gray-500"
-                      >
-                        No medical devices found.
-                      </td>
-                    </tr>
-                  )}
               </tbody>
             </table>
           </div>
+
+          {medicalDevices.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No medical devices found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">

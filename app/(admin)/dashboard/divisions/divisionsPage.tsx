@@ -43,56 +43,63 @@ export default function DivisionsPage() {
     description: "",
   });
 
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchDivisions = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
+  const fetchDivisions = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
 
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
 
-      const res = await fetch(
-        `http://report-api.test/api/division?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
+        const res = await fetch(
+          `http://report-api.test/api/division?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
-      if (!res.ok) throw new Error("Failed to fetch divisions");
-      const json = await res.json();
+        if (!res.ok) throw new Error("Failed to fetch divisions");
+        const json = await res.json();
 
-      // Safe data handling dengan default values
-      const divisionsData = Array.isArray(json.data)
-        ? json.data.map((d: Partial<Division>) => ({
-            id: d.id || 0,
-            name: d.name || "",
-            slug: d.slug || "",
-            description: d.description || "",
-            created_at: d.created_at || "",
-            updated_at: d.updated_at || "",
-          }))
-        : [];
+        const divisionsData = Array.isArray(json.data)
+          ? json.data.map((d: Partial<Division>) => ({
+              id: d.id || 0,
+              name: d.name || "",
+              slug: d.slug || "",
+              description: d.description || "",
+              created_at: d.created_at || "",
+              updated_at: d.updated_at || "",
+            }))
+          : [];
 
-      setDivisions(divisionsData);
-      setCurrentPage(json.meta.current_page);
-      setTotalPages(json.meta.last_page);
-      setTotalDivision(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error fetching divisions");
-      setDivisions([]); // Set empty array pada error
-    } finally {
-      setLoading(false);
-    }
-  };
+        setDivisions(divisionsData);
+        setCurrentPage(json.meta.current_page);
+        setTotalPages(json.meta.last_page);
+        setTotalDivision(json.meta.total);
+        setPerPage(json.meta.per_page);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Error fetching divisions"
+        );
+        setDivisions([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   const generateSlug = (name: string) => {
     return name
@@ -168,7 +175,6 @@ export default function DivisionsPage() {
             popup: "rounded-xl p-6",
           },
         });
-
       } else {
         const errorData = await res.json();
         console.error("Error response:", errorData); // Debug log
@@ -252,6 +258,126 @@ export default function DivisionsPage() {
     }
   };
 
+  // Multi-delete functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(divisions.map((item) => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleMultiDelete = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedDivisions = divisions.filter((cat) =>
+      selectedItems.has(cat.id)
+    );
+    const categoryNames = selectedDivisions.map((cat) => cat.name).join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Categories?",
+      html: `
+            <p>You are about to delete <strong>${selectedItems.size}</strong> divisions:</p>
+            <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${categoryNames}</p>
+            <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+          `,
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("Token not found");
+        }
+
+        const deletePromises = selectedDivisions.map((item) =>
+          fetch(`http://report-api.test/api/division/${item.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          })
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        // Count successful deletions
+        const successCount = results.filter(
+          (result) => result.status === "fulfilled" && result.value.ok
+        ).length;
+
+        const failedCount = selectedItems.size - successCount;
+
+        // Refresh data
+        await fetchDivisions();
+
+        // Show result
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} divisions.`,
+            icon: "success",
+            timer: 3000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} divisions successfully. ${failedCount} failed to delete.`,
+            icon: "warning",
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error in multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to delete divisions. Please try again.",
+          icon: "error",
+          background: "#1f2937",
+          color: "#F9FAFB",
+        });
+      } finally {
+        setIsDeleting(false);
+        setSelectedItems(new Set());
+      }
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const initializeData = async () => {
@@ -270,7 +396,7 @@ export default function DivisionsPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchDivisions]);
 
   // Search debounce
   useEffect(() => {
@@ -281,7 +407,7 @@ export default function DivisionsPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchDivisions]);
 
   // Auto-generate slug when name changes
   useEffect(() => {
@@ -347,6 +473,10 @@ export default function DivisionsPage() {
     }
   };
 
+  const isAllSelected =
+    divisions.length > 0 && divisions.every((cat) => selectedItems.has(cat.id));
+  const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
+
   return (
     <>
       <div className="space-y-6">
@@ -361,14 +491,29 @@ export default function DivisionsPage() {
             </p>
           </div>
 
-          {hasPermission("create-division") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Division
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedItems.size > 0 && hasPermission("delete-division") && (
+              <button
+                onClick={handleMultiDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {isDeleting
+                  ? "Deleting..."
+                  : `Delete ${selectedItems.size} Items`}
+              </button>
+            )}
+
+            {hasPermission("create-division") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Division
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -377,13 +522,34 @@ export default function DivisionsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search divisions by name or slug..."
+              placeholder="Search divisions by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
         </div>
+
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-300 text-sm">
+              {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -397,6 +563,19 @@ export default function DivisionsPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                {hasPermission("delete-division") && (
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   No
                 </th>
@@ -421,6 +600,18 @@ export default function DivisionsPage() {
               {Array.isArray(divisions) &&
                 divisions.map((division, index) => (
                   <tr key={division.id} className="hover:bg-gray-800">
+                    {hasPermission("delete-division") && (
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(division.id)}
+                          onChange={(e) =>
+                            handleSelectItem(division.id, e.target.checked)
+                          }
+                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
@@ -465,20 +656,21 @@ export default function DivisionsPage() {
                     </td>
                   </tr>
                 ))}
-
-              {(!Array.isArray(divisions) || divisions.length === 0) &&
-                !loading && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No divisions found.
-                    </td>
-                  </tr>
-                )}
             </tbody>
           </table>
+
+          {divisions.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No divisions found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">

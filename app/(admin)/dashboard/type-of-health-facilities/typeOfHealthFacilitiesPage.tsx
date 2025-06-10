@@ -46,6 +46,9 @@ export default function TypeOfHealthFacilitiesPage() {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<FormTypeOfHealthFacility>({
     name: "",
@@ -55,59 +58,153 @@ export default function TypeOfHealthFacilitiesPage() {
 
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchTypeOfHealthFacilities = async (
-    page: number = 1,
-    search: string = ""
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
+  const fetchTypeOfHealthFacilities = useCallback(
+    async (page: number = 1, search: string = "") => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
 
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
 
-      const res = await fetch(
-        `http://report-api.test/api/type-of-health-facility?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
+        const res = await fetch(
+          `http://report-api.test/api/type-of-health-facility?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
-      if (!res.ok) throw new Error("Failed to fetch type of health facilities");
-      const json = await res.json();
+        if (!res.ok)
+          throw new Error("Failed to fetch type of health facilities");
+        const json = await res.json();
 
-      // Safe data handling dengan default values
-      const facilitiesData = Array.isArray(json.data)
-        ? json.data.map((f: Partial<TypeOfHealthFacility>) => ({
-            id: f.id || 0,
-            name: f.name || "",
-            slug: f.slug || "",
-            description: f.description || "",
-            created_at: f.created_at || "",
-            updated_at: f.updated_at || "",
-          }))
-        : [];
+        // Safe data handling dengan default values
+        const facilitiesData = Array.isArray(json.data)
+          ? json.data.map((f: Partial<TypeOfHealthFacility>) => ({
+              id: f.id || 0,
+              name: f.name || "",
+              slug: f.slug || "",
+              description: f.description || "",
+              created_at: f.created_at || "",
+              updated_at: f.updated_at || "",
+            }))
+          : [];
 
-      setTypeOfHealthFacilities(facilitiesData);
-      setCurrentPage(json.meta.current_page);
-      setTotalPages(json.meta.last_page);
-      setTotalTypeOfFacility(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Error fetching type of health facilities"
-      );
-      setTypeOfHealthFacilities([]); // Set empty array pada error
-    } finally {
-      setLoading(false);
+        setTypeOfHealthFacilities(facilitiesData);
+        setCurrentPage(json.meta.current_page);
+        setTotalPages(json.meta.last_page);
+        setTotalTypeOfFacility(json.meta.total);
+        setPerPage(json.meta.per_page);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error fetching type of health facilities"
+        );
+        setTypeOfHealthFacilities([]); // Set empty array pada error
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(typeOfHealthFacilities.map((f) => f.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  // const handleSelectItem = (id: number, checked: boolean) => {
+  //   const updated = new Set(selectedItems);
+  //   checked ? updated.add(id) : updated.delete(id);
+  //   setSelectedItems(updated);
+  // };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    const updated = new Set(selectedItems);
+    if (checked) {
+      updated.add(id);
+    } else {
+      updated.delete(id);
+    }
+    setSelectedItems(updated);
+  };
+
+  const handleMultiDelete = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedFacilities = typeOfHealthFacilities.filter((f) =>
+      selectedItems.has(f.id)
+    );
+    const names = selectedFacilities.map((f) => f.name).join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Types?",
+      html: `
+      <p>You are about to delete <strong>${selectedItems.size}</strong> types:</p>
+      <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${names}</p>
+      <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+    `,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: { popup: "rounded-xl" },
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        const deletePromises = selectedFacilities.map((f) =>
+          fetch(
+            `http://report-api.test/api/type-of-health-facility/${f.slug}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          )
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+        const successCount = results.filter(
+          (r) => r.status === "fulfilled" && r.value.ok
+        ).length;
+
+        await fetchTypeOfHealthFacilities();
+        setSelectedItems(new Set());
+
+        Swal.fire({
+          title: "Deleted!",
+          text: `Successfully deleted ${successCount} items.`,
+          icon: "success",
+          background: "#1f2937",
+          color: "#F9FAFB",
+          timer: 2000,
+          showConfirmButton: false,
+          timerProgressBar: true,
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Error", "Failed to delete items.", "error");
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -289,7 +386,7 @@ export default function TypeOfHealthFacilitiesPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchTypeOfHealthFacilities]);
 
   // Search debounce
   useEffect(() => {
@@ -300,7 +397,7 @@ export default function TypeOfHealthFacilitiesPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchTypeOfHealthFacilities]);
 
   // Auto-generate slug when name changes
   useEffect(() => {
@@ -380,15 +477,30 @@ export default function TypeOfHealthFacilitiesPage() {
               Manage types of health facilities in the system
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            {selectedItems.size > 0 &&
+              hasPermission("delete-type-of-health-facility") && (
+                <button
+                  onClick={handleMultiDelete}
+                  disabled={isDeleting}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {isDeleting
+                    ? "Deleting..."
+                    : `Delete ${selectedItems.size} Items`}
+                </button>
+              )}
 
-          {hasPermission("create-type-of-health-facility") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Type of Health Facility
-            </button>
-          )}
+            {hasPermission("create-type-of-health-facility") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Type of Health Facility
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -397,13 +509,34 @@ export default function TypeOfHealthFacilitiesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search type of health facilities by name or slug..."
+              placeholder="Search type of health facilities by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
         </div>
+
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-300 text-sm">
+              {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -417,6 +550,28 @@ export default function TypeOfHealthFacilitiesPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
+                {hasPermission("delete-type-of-health-facility") && (
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={
+                        typeOfHealthFacilities.length > 0 &&
+                        typeOfHealthFacilities.every((f) =>
+                          selectedItems.has(f.id)
+                        )
+                      }
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            selectedItems.size > 0 &&
+                            selectedItems.size < typeOfHealthFacilities.length;
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    />
+                  </th>
+                )}
+
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   No
                 </th>
@@ -441,6 +596,19 @@ export default function TypeOfHealthFacilitiesPage() {
               {Array.isArray(typeOfHealthFacilities) &&
                 typeOfHealthFacilities.map((facility, index) => (
                   <tr key={facility.id} className="hover:bg-gray-800">
+                    {hasPermission("delete-type-of-health-facility") && (
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(facility.id)}
+                          onChange={(e) =>
+                            handleSelectItem(facility.id, e.target.checked)
+                          }
+                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                        />
+                      </td>
+                    )}
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
@@ -485,21 +653,21 @@ export default function TypeOfHealthFacilitiesPage() {
                     </td>
                   </tr>
                 ))}
-
-              {(!Array.isArray(typeOfHealthFacilities) ||
-                typeOfHealthFacilities.length === 0) &&
-                !loading && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      No type of health facilities found.
-                    </td>
-                  </tr>
-                )}
             </tbody>
           </table>
+
+          {typeOfHealthFacilities.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No Type Of Health Facilities found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">
@@ -510,56 +678,56 @@ export default function TypeOfHealthFacilitiesPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-gray-400">
-            Showing {(currentPage - 1) * perPage + 1} to{" "}
-            {Math.min(currentPage * perPage, totalTypeOfFacility)} of {totalTypeOfFacility}{" "}
-            results
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-400">
+              Showing {(currentPage - 1) * perPage + 1} to{" "}
+              {Math.min(currentPage * perPage, totalTypeOfFacility)} of{" "}
+              {totalTypeOfFacility} results
+            </div>
+
+            <div className="flex items-center space-x-1">
+              {/* Previous button */}
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              {getPaginationNumbers().map((page, index) => (
+                <div key={index}>
+                  {page === "..." ? (
+                    <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handlePageChange(page as number)}
+                      className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Next button */}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
-
-          <div className="flex items-center space-x-1">
-            {/* Previous button */}
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
-            >
-              Previous
-            </button>
-
-            {/* Page numbers */}
-            {getPaginationNumbers().map((page, index) => (
-              <div key={index}>
-                {page === "..." ? (
-                  <span className="px-3 py-2 text-sm text-gray-500 cursor-pointer">
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handlePageChange(page as number)}
-                    className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
-                      currentPage === page
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "border-gray-600 text-gray-300 hover:bg-gray-700"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {/* Next button */}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* Modal */}

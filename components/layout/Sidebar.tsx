@@ -29,7 +29,8 @@ interface MenuItem {
   label: string;
   href?: string;
   icon: LucideIcon;
-  permission?: string;
+  permissionHeader?: string[];
+  permissionChild?: string;
   children?: MenuItem[];
 }
 
@@ -47,24 +48,25 @@ const menuItems: MenuItem[] = [
     label: "User Management",
     href: "#",
     icon: SquareUserRound,
+    permissionHeader: ["view-roles", "view-permission", "view-users"],
     children: [
-       {
+      {
         label: "Permissions",
         href: "/dashboard/permissions",
         icon: Key,
-        permission: "view-roles",
+        permissionChild: "view-permission",
       },
       {
         label: "Roles",
         href: "/dashboard/roles",
         icon: Shield,
-        permission: "view-roles",
+        permissionChild: "view-roles",
       },
       {
         label: "Users",
         href: "/dashboard/users",
         icon: Users,
-        permission: "view-users",
+        permissionChild: "view-users",
       },
     ],
   },
@@ -72,44 +74,52 @@ const menuItems: MenuItem[] = [
     label: "Master Data",
     href: "#",
     icon: Building2,
+    permissionHeader: [
+      "view-medical-device-category",
+      "view-medical-device",
+      "view-type-of-health-facility",
+      "view-health-facility",
+      "view-health-facility",
+      "view-division",
+      "view-position"
+    ],
     children: [
       {
         label: "Device Categories ",
         href: "/dashboard/medical-device-categories",
         icon: MonitorCog,
-        permission: "view-medical-device-category",
+        permissionChild: "view-medical-device-category",
       },
       {
         label: "Medical Devices ",
         href: "/dashboard/medical-devices",
         icon: MonitorSmartphone,
-        permission: "view-medical-device",
+        permissionChild: "view-medical-device",
       },
-       {
+      {
         label: "Type Of Facilities",
         href: "/dashboard/type-of-health-facilities",
         icon: ClipboardTypeIcon,
-        permission: "view-type-of-health-facility",
+        permissionChild: "view-type-of-health-facility",
       },
       {
         label: "Health Facilities",
         href: "/dashboard/health-facilities",
         icon: Hospital,
-        permission: "view-health-facility",
+        permissionChild: "view-health-facility",
       },
       {
         label: "Divisions",
         href: "/dashboard/divisions",
         icon: Layers2,
-        permission: "view-division",
+        permissionChild: "view-division",
       },
       {
         label: "Positions",
         href: "/dashboard/positions",
         icon: FileBoxIcon,
-        permission: "view-position",
+        permissionChild: "view-position",
       },
-
     ],
   },
 ];
@@ -118,17 +128,69 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [activeHref, setActiveHref] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
 
   useEffect(() => {
     const stored = Cookies.get("permissions");
+    const role = Cookies.get("role"); // Tambahkan ini untuk mengambil role
+    
     if (stored) {
       setPermissions(JSON.parse(stored));
+    }
+    
+    if (role) {
+      setUserRole(role);
     }
   }, []);
 
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
+    
+    // Jika user adalah super admin, berikan akses ke semua menu
+    if (userRole === "super-admin" || userRole === "Super Admin") {
+      return true;
+    }
+    
     return permissions.includes(perm);
+  };
+
+  // Fungsi untuk mengecek apakah user memiliki salah satu dari permission header
+  const hasAnyPermission = (permissionList?: string[]) => {
+    if (!permissionList || permissionList.length === 0) return true;
+    
+    // Jika user adalah super admin, berikan akses ke semua menu
+    if (userRole === "super-admin" || userRole === "Super Admin") {
+      return true;
+    }
+    
+    return permissionList.some(permission => hasPermission(permission));
+  };
+
+  // Fungsi untuk mengecek apakah menu item memiliki children yang visible
+  const hasVisibleChildren = (item: MenuItem) => {
+    if (!item.children || item.children.length === 0) return false;
+    
+    // Jika user adalah super admin, semua children akan visible
+    if (userRole === "super-admin" || userRole === "Super Admin") {
+      return true;
+    }
+    
+    return item.children.some(child => hasPermission(child.permissionChild));
+  };
+
+  // Fungsi untuk memfilter menu items berdasarkan permission
+  const getFilteredMenuItems = () => {
+    return menuItems.filter((item) => {
+      // Jika item tidak memiliki children, cek permission biasa
+      if (!item.children || item.children.length === 0) {
+        return hasPermission(item.permissionChild);
+      }
+      
+      // Jika item memiliki children, cek:
+      // 1. Apakah user memiliki permission untuk header (permissionHeader)
+      // 2. Dan apakah ada minimal 1 child yang visible
+      return hasAnyPermission(item.permissionHeader) && hasVisibleChildren(item);
+    });
   };
 
   useEffect(() => {
@@ -146,7 +208,9 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => {
     const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
     const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
-    const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(
+      null
+    );
 
     const toggleMenu = (label: string) => {
       if (collapsed) return; // Don't allow toggle when collapsed
@@ -158,29 +222,29 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
 
     const handleMouseEnter = (label: string) => {
       if (!collapsed) return;
-      
+
       // Clear any existing timeout
       if (hoverTimeout) {
         clearTimeout(hoverTimeout);
       }
-      
+
       setHoveredMenu(label);
     };
 
     const handleMouseLeave = () => {
       if (!collapsed) return;
-      
+
       // Add delay before hiding popup
       const timeout = setTimeout(() => {
         setHoveredMenu(null);
       }, 150); // 150ms delay
-      
+
       setHoverTimeout(timeout);
     };
 
     const handlePopupMouseEnter = () => {
       if (!collapsed) return;
-      
+
       // Clear timeout when mouse enters popup
       if (hoverTimeout) {
         clearTimeout(hoverTimeout);
@@ -190,7 +254,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
 
     const handlePopupMouseLeave = () => {
       if (!collapsed) return;
-      
+
       // Hide popup when mouse leaves popup area
       setHoveredMenu(null);
     };
@@ -204,9 +268,12 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
       };
     }, [hoverTimeout]);
 
+    // Dapatkan menu items yang sudah difilter berdasarkan permission
+    const filteredMenuItems = getFilteredMenuItems();
+
     return (
       <nav className="flex flex-col gap-1 p-0">
-        {menuItems.map((item) => {
+        {filteredMenuItems.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
 
           if (hasChildren) {
@@ -242,7 +309,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                 {isOpen && !collapsed && (
                   <div className="ml-4 mt-1 flex flex-col gap-1">
                     {(item.children ?? [])
-                      .filter((child) => hasPermission(child.permission))
+                      .filter((child) => hasPermission(child.permissionChild))
                       .map((child) => {
                         const isActive = activeHref === child.href;
                         const IconComponent = child.icon;
@@ -259,7 +326,10 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                                 : "text-white hover:bg-red-700 hover:text-white"
                             )}
                           >
-                            <IconComponent size={18} className="flex-shrink-0" />
+                            <IconComponent
+                              size={18}
+                              className="flex-shrink-0"
+                            />
                             {child.label}
                           </Link>
                         );
@@ -269,7 +339,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
 
                 {/* Popup submenu when collapsed */}
                 {isHovered && collapsed && (
-                  <div 
+                  <div
                     className="absolute left-full top-0 ml-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 min-w-48"
                     onMouseEnter={handlePopupMouseEnter}
                     onMouseLeave={handlePopupMouseLeave}
@@ -280,7 +350,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                       </div>
                       <div className="flex flex-col gap-1">
                         {(item.children ?? [])
-                          .filter((child) => hasPermission(child.permission))
+                          .filter((child) => hasPermission(child.permissionChild))
                           .map((child) => {
                             const isActive = activeHref === child.href;
                             const IconComponent = child.icon;
@@ -305,7 +375,10 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                                     : "text-white hover:bg-red-700 hover:text-white"
                                 )}
                               >
-                                <IconComponent size={18} className="flex-shrink-0" />
+                                <IconComponent
+                                  size={18}
+                                  className="flex-shrink-0"
+                                />
                                 {child.label}
                               </Link>
                             );
@@ -318,8 +391,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
             );
           }
 
-          if (!hasPermission(item.permission)) return null;
-
+          // Single menu item without children - sudah difilter di getFilteredMenuItems()
           const isActive = activeHref === item.href;
           const IconComponent = item.icon;
 
@@ -349,7 +421,7 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   return (
     <>
       {/* Sidebar Desktop */}
-      <aside 
+      <aside
         className={clsx(
           "bg-gray-900 border-r h-auto p-4 hidden md:block text-gray-700 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-16" : "w-64"

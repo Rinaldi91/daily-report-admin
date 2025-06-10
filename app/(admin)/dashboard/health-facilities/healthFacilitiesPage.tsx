@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
+import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
 
 interface TypeOfHealthFacility {
   id: number;
@@ -105,6 +106,13 @@ export default function HealthFacilitiesPage() {
     medical_device_ids: [],
   });
 
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<
+    { label: string; value: number }[]
+  >([]);
+
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const hasPermission = (slug: string) => userPermissions.includes(slug);
 
   const fetchMedicalDevices = async () => {
@@ -187,70 +195,75 @@ export default function HealthFacilitiesPage() {
     }
   };
 
-  const fetchHealthFacilities = async (
-    page: number = 1,
-    search: string = ""
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = Cookies.get("token");
-      if (!token) throw new Error("Unauthorized");
+  const fetchHealthFacilities = useCallback(
+    async (page: number = 1, search: string = "", typeIds: number[] = []) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
 
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      if (search.trim()) params.append("search", search);
-
-      const res = await fetch(
-        `http://report-api.test/api/health-facility?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        if (search.trim()) params.append("search", search);
+        if (typeIds.length > 0) {
+          typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
         }
-      );
 
-      if (!res.ok) throw new Error("Failed to fetch health facilities");
-      const json = await res.json();
-
-      const facilitiesData = Array.isArray(json.data)
-        ? json.data.map((f: Partial<HealthFacility>) => ({
-            id: f.id || 0,
-            type_of_health_facility_id: f.type_of_health_facility_id || 0,
-            name: f.name || "",
-            slug: f.slug || "",
-            email: f.email || "",
-            phone_number: f.phone_number || "",
-            city: f.city || "",
-            address: f.address || "",
-            created_at: f.created_at || "",
-            updated_at: f.updated_at || "",
-            type: f.type || {
-              id: 0,
-              name: "",
-              slug: "",
-              description: "",
-              created_at: "",
-              updated_at: "",
+        const res = await fetch(
+          `http://report-api.test/api/health-facility?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
             },
-          }))
-        : [];
+          }
+        );
 
-      setHealthFacilities(facilitiesData);
-      setCurrentPage(json.meta.current_page);
-      setTotalPages(json.meta.last_page);
-      setTotalHealthFacility(json.meta.total);
-      setPerPage(json.meta.per_page);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Error fetching health facilities"
-      );
-      setHealthFacilities([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (!res.ok) throw new Error("Failed to fetch health facilities");
+        const json = await res.json();
+
+        const facilitiesData = Array.isArray(json.data)
+          ? json.data.map((f: Partial<HealthFacility>) => ({
+              id: f.id || 0,
+              type_of_health_facility_id: f.type_of_health_facility_id || 0,
+              name: f.name || "",
+              slug: f.slug || "",
+              email: f.email || "",
+              phone_number: f.phone_number || "",
+              city: f.city || "",
+              address: f.address || "",
+              created_at: f.created_at || "",
+              updated_at: f.updated_at || "",
+              type: f.type || {
+                id: 0,
+                name: "",
+                slug: "",
+                description: "",
+                created_at: "",
+                updated_at: "",
+              },
+            }))
+          : [];
+
+        setHealthFacilities(facilitiesData);
+        setCurrentPage(json.meta.current_page);
+        setTotalPages(json.meta.last_page);
+        setTotalHealthFacility(json.meta.total);
+        setPerPage(json.meta.per_page);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error fetching health facilities"
+        );
+        setHealthFacilities([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   const generateSlug = (name: string) => {
     return name
@@ -261,20 +274,45 @@ export default function HealthFacilitiesPage() {
       .trim();
   };
 
-  const handleEdit = (facility: HealthFacility) => {
-    setFormData({
-      id: facility.id,
-      type_of_health_facility_id:
-        facility.type_of_health_facility_id.toString(),
-      name: facility.name || "",
-      slug: facility.slug || "",
-      email: facility.email || "",
-      phone_number: facility.phone_number || "",
-      city: facility.city || "",
-      address: facility.address || "",
-      medical_device_ids: formData.medical_device_ids,
-    });
-    setIsModalOpen(true);
+  const handleEdit = async (facility: HealthFacility) => {
+    try {
+      const token = Cookies.get("token");
+      const res = await fetch(
+        `http://report-api.test/api/health-facility/${facility.slug}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+      const json = await res.json();
+
+      if (json?.data) {
+        const detail: HealthFacilityDetail = json.data;
+        const deviceIds = detail.medical_devices?.map((d) => d.id) || [];
+
+        setFormData({
+          id: detail.id,
+          type_of_health_facility_id:
+            detail.type_of_health_facility_id.toString(),
+          name: detail.name || "",
+          slug: detail.slug || "",
+          email: detail.email || "",
+          phone_number: detail.phone_number || "",
+          city: detail.city || "",
+          address: detail.address || "",
+          medical_device_ids: deviceIds,
+        });
+
+        setIsModalOpen(true);
+      } else {
+        Swal.fire("Error", "Gagal mendapatkan detail fasilitas", "error");
+      }
+    } catch (error) {
+      console.error("Error while fetching detail for edit:", error);
+      Swal.fire("Error", "Terjadi kesalahan jaringan", "error");
+    }
   };
 
   const handleAdd = () => {
@@ -286,7 +324,7 @@ export default function HealthFacilitiesPage() {
       phone_number: "",
       city: "",
       address: "",
-      medical_device_ids: formData.medical_device_ids,
+      medical_device_ids: [], // harus dikosongkan
     });
     setIsModalOpen(true);
   };
@@ -441,6 +479,128 @@ export default function HealthFacilitiesPage() {
     }
   };
 
+  // Multi-delete functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(healthFacilities.map((item) => item.id));
+      setSelectedItems(allIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleMultiDelete = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedHealthFacilities = healthFacilities.filter((cat) =>
+      selectedItems.has(cat.id)
+    );
+    const healthFacilityNames = selectedHealthFacilities
+      .map((cat) => cat.name)
+      .join(", ");
+
+    const result = await Swal.fire({
+      title: "Delete Multiple Health Facilities?",
+      html: `
+          <p>You are about to delete <strong>${selectedItems.size}</strong> health facilities:</p>
+          <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${healthFacilityNames}</p>
+          <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
+        `,
+      icon: "warning",
+      showCancelButton: true,
+      background: "#111827",
+      color: "#F9FAFB",
+      customClass: {
+        popup: "rounded-xl",
+      },
+      confirmButtonText: "Yes, delete all!",
+      confirmButtonColor: "#EF4444",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) {
+          throw new Error("Token not found");
+        }
+
+        const deletePromises = selectedHealthFacilities.map((item) =>
+          fetch(`http://report-api.test/api/health-facility/${item.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          })
+        );
+
+        const results = await Promise.allSettled(deletePromises);
+
+        // Count successful deletions
+        const successCount = results.filter(
+          (result) => result.status === "fulfilled" && result.value.ok
+        ).length;
+
+        const failedCount = selectedItems.size - successCount;
+
+        // Refresh data
+        await fetchHealthFacilities();
+
+        // Show result
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} health facilities.`,
+            icon: "success",
+            timer: 3000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} health facility successfully. ${failedCount} failed to delete.`,
+            icon: "warning",
+            background: "#1f2937",
+            color: "#F9FAFB",
+            customClass: {
+              popup: "rounded-xl p-6",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error in multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to delete health facility. Please try again.",
+          icon: "error",
+          background: "#1f2937",
+          color: "#F9FAFB",
+        });
+      } finally {
+        setIsDeleting(false);
+        setSelectedItems(new Set());
+      }
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const initializeData = async () => {
@@ -461,7 +621,7 @@ export default function HealthFacilitiesPage() {
     };
 
     initializeData();
-  }, []);
+  }, [fetchHealthFacilities]);
 
   // Search debounce
   useEffect(() => {
@@ -472,7 +632,7 @@ export default function HealthFacilitiesPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm]);
+  }, [searchTerm, fetchHealthFacilities]);
 
   // Auto-generate slug when name changes
   useEffect(() => {
@@ -497,6 +657,11 @@ export default function HealthFacilitiesPage() {
     },
     [searchTerm, totalPages, fetchHealthFacilities]
   );
+
+  useEffect(() => {
+    const typeIds = selectedTypeFilters.map((item) => item.value);
+    fetchHealthFacilities(1, searchTerm, typeIds);
+  }, [selectedTypeFilters, searchTerm, fetchHealthFacilities]);
 
   const getPaginationNumbers = () => {
     const delta = 2;
@@ -528,18 +693,23 @@ export default function HealthFacilitiesPage() {
     return rangeWithDots;
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
-    try {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return "-";
-    }
-  };
+  // const formatDate = (dateString: string) => {
+  //   if (!dateString) return "-";
+  //   try {
+  //     return new Date(dateString).toLocaleDateString("en-US", {
+  //       year: "numeric",
+  //       month: "short",
+  //       day: "numeric",
+  //     });
+  //   } catch {
+  //     return "-";
+  //   }
+  // };
+
+  const isAllSelected =
+    healthFacilities.length > 0 &&
+    healthFacilities.every((cat) => selectedItems.has(cat.id));
+  const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
 
   return (
     <>
@@ -554,30 +724,94 @@ export default function HealthFacilitiesPage() {
               Manage health facilities and their information
             </p>
           </div>
-
-          {hasPermission("create-health-facility") && (
-            <button
-              onClick={handleAdd}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Add Health Facility
-            </button>
-          )}
-        </div>
-
-        {/* Search */}
-        <div className="bg-gray-900 p-4 rounded-lg">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search health facilities by name, city, or type..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
-            />
+          <div className="flex items-center gap-2">
+            {selectedItems.size > 0 &&
+              hasPermission("delete-health-facility") && (
+                <button
+                  onClick={handleMultiDelete}
+                  disabled={isDeleting}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {isDeleting
+                    ? "Deleting..."
+                    : `Delete ${selectedItems.size} Items`}
+                </button>
+              )}
+            {hasPermission("create-health-facility") && (
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Health Facility
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Search & filter */}
+        <div className="bg-gray-900 p-4 rounded-lg">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+            {/* Search input (kiri) */}
+            <div className="relative w-full md:w-1/2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search health facilities by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
+              />
+              {searchTerm && (
+                <X
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                  onClick={() => setSearchTerm("")}
+                />
+              )}
+            </div>
+
+            {/* MultiSelectPopover (kanan) */}
+            <div className="w-full md:w-1/2">
+              <MultiSelectPopover
+                options={healthFacilityTypes.map((type) => ({
+                  label: type.name,
+                  value: type.id,
+                }))}
+                selected={selectedTypeFilters}
+                onChange={(newSelected) => setSelectedTypeFilters(newSelected)}
+                placeholder="Filter by facility type"
+              />
+            </div>
+
+            {selectedTypeFilters.length > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedTypeFilters([]);
+                  setSearchTerm("");
+                }}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 hover:text-white transition cursor-pointer"
+                title="Clear filter"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-300 text-sm">
+              {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+              selected
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -592,6 +826,19 @@ export default function HealthFacilitiesPage() {
             <table className="w-full">
               <thead className="bg-gray-800 text-white">
                 <tr>
+                  {hasPermission("delete-health-facility") && (
+                    <th className="px-6 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = isIndeterminate;
+                        }}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                     No
                   </th>
@@ -607,9 +854,9 @@ export default function HealthFacilitiesPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                     Location
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  {/* <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                     Created
-                  </th>
+                  </th> */}
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                     Actions
                   </th>
@@ -619,6 +866,18 @@ export default function HealthFacilitiesPage() {
                 {Array.isArray(healthFacilities) &&
                   healthFacilities.map((facility, index) => (
                     <tr key={facility.id} className="hover:bg-gray-800">
+                      {hasPermission("delete-health-facility") && (
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.has(facility.id)}
+                            onChange={(e) =>
+                              handleSelectItem(facility.id, e.target.checked)
+                            }
+                            className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {(currentPage - 1) * perPage + index + 1}
                       </td>
@@ -657,9 +916,9 @@ export default function HealthFacilitiesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-400 text-sm">
+                      {/* <td className="px-6 py-4 text-gray-400 text-sm">
                         {formatDate(facility.created_at)}
-                      </td>
+                      </td> */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {hasPermission("show-health-facility") && (
@@ -690,22 +949,22 @@ export default function HealthFacilitiesPage() {
                       </td>
                     </tr>
                   ))}
-
-                {(!Array.isArray(healthFacilities) ||
-                  healthFacilities.length === 0) &&
-                  !loading && (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-6 py-8 text-center text-gray-500"
-                      >
-                        No health facilities found.
-                      </td>
-                    </tr>
-                  )}
               </tbody>
             </table>
           </div>
+
+          {healthFacilities.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                No health facilities found
+              </div>
+              <div className="text-gray-500 text-sm">
+                {searchTerm
+                  ? "Try adjusting your search criteria"
+                  : "No users available"}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="py-8 text-center text-gray-400">
@@ -719,8 +978,8 @@ export default function HealthFacilitiesPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-400">
               Showing {(currentPage - 1) * perPage + 1} to{" "}
-              {Math.min(currentPage * perPage, totalHealthFacility)} of {totalHealthFacility}{" "}
-              results
+              {Math.min(currentPage * perPage, totalHealthFacility)} of{" "}
+              {totalHealthFacility} results
             </div>
 
             <div className="flex items-center space-x-1">
@@ -814,7 +1073,7 @@ export default function HealthFacilitiesPage() {
                         type_of_health_facility_id: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full h-[42px] px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
                   >
                     <option value="">Select facility type</option>
                     {healthFacilityTypes.map((type) => (
@@ -981,12 +1240,12 @@ export default function HealthFacilitiesPage() {
                  bg-white dark:bg-gray-900 shadow-2xl rounded-2xl 
                  w-[95%] md:w-[850px] max-h-[90vh] 
                  animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%]
-                 border border-gray-200 dark:border-gray-700"
+                 border border-gray-200 dark:border-gray-700 mt-8"
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
             {/* Header dengan gradient */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl mt-9">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
               <Dialog.Title className="text-2xl font-bold flex items-center gap-3">
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                   <svg
@@ -1115,7 +1374,7 @@ export default function HealthFacilitiesPage() {
                     </h3>
 
                     {selectedFacility.medical_devices?.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedFacility.medical_devices.map((device) => (
                           <div
                             key={device.id}
