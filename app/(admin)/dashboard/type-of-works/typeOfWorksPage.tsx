@@ -5,107 +5,59 @@ import Cookies from "js-cookie";
 import {
   Edit,
   Trash2,
-  Shield,
   Plus,
   Search,
   X,
   Save,
   Pencil,
   PlusCircle,
+  Waypoints,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 
-interface Permission {
+interface TypeOfWork {
   id: number;
   name: string;
   slug: string;
-}
-
-interface Role {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
+  description: string | null;
   created_at: string;
   updated_at: string;
-  permissions: Permission[];
 }
 
-interface FormRole {
+interface FormTypeOfWork {
   id?: number;
   name: string;
+  slug: string;
   description: string;
-  permission_ids: number[];
 }
 
-export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
+export default function TypeOfWorkPage() {
+  const [typeOfWorks, setTypeOfWorks] = useState<TypeOfWork[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalRoles, setTotalRoles] = useState(0);
+  const [totalTypeOfWork, setTotalTypeOfWork] = useState(0);
   const [perPage, setPerPage] = useState(10);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<FormRole>({
+  const [formData, setFormData] = useState<FormTypeOfWork>({
     name: "",
+    slug: "",
     description: "",
-    permission_ids: [],
   });
-  const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
 
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const hasPermission = (slug: string) => permissions.includes(slug);
+  const hasPermission = (slug: string) => userPermissions.includes(slug);
 
-  const fetchPermissions = async () => {
-    try {
-      const token = Cookies.get("token");
-      if (!token) {
-        throw new Error("Token not found");
-      }
-
-      const res = await fetch("http://report-api.test/api/permission", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch permissions");
-      }
-
-      const json = await res.json();
-      console.log("Permissions response:", json); // Debug log
-
-      // Handle different response structures
-      let permissionsData = [];
-      if (Array.isArray(json.data)) {
-        permissionsData = json.data;
-      } else if (Array.isArray(json)) {
-        permissionsData = json;
-      } else if (json.permissions && Array.isArray(json.permissions)) {
-        permissionsData = json.permissions;
-      }
-
-      console.log("Processed permissions:", permissionsData); // Debug log
-      setAllPermissions(permissionsData);
-    } catch (error) {
-      console.error("Error fetching permissions:", error);
-      setAllPermissions([]);
-    }
-  };
-
-  const fetchRoles = useCallback(
+  const fetchTypeOfWork = useCallback(
     async (page: number = 1, search: string = "") => {
       try {
         setLoading(true);
@@ -118,7 +70,7 @@ export default function RolesPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/roles?${params.toString()}`,
+          `http://report-api.test/api/type-of-work?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -127,50 +79,58 @@ export default function RolesPage() {
           }
         );
 
-        if (!res.ok) throw new Error("Failed to fetch roles");
+        if (!res.ok) throw new Error("Failed to fetch type of works");
         const json = await res.json();
 
-        const rolesData = Array.isArray(json.data)
-          ? json.data.map((r: Partial<Role>) => ({
-              id: r.id || 0,
-              name: r.name || "",
-              slug: r.slug || "",
-              description: r.description || "",
-              created_at: r.created_at || "",
-              updated_at: r.updated_at || "",
-              permissions: Array.isArray(r.permissions) ? r.permissions : [],
+        const typeOfWorkData = Array.isArray(json.data)
+          ? json.data.map((p: Partial<TypeOfWork>) => ({
+              id: p.id || 0,
+              name: p.name || "",
+              slug: p.slug || "",
+              description: p.description || "",
+              created_at: p.created_at || "",
+              updated_at: p.updated_at || "",
             }))
           : [];
 
-        setRoles(rolesData);
+        setTypeOfWorks(typeOfWorkData);
         setCurrentPage(json.meta.current_page);
         setTotalPages(json.meta.last_page);
-        setTotalRoles(json.meta.total);
+        setTotalTypeOfWork(json.meta.total);
         setPerPage(json.meta.per_page);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Error fetching roles");
-        setRoles([]);
+        setError(
+          err instanceof Error ? err.message : "Error fetching type of work"
+        );
+        setTypeOfWorks([]);
       } finally {
         setLoading(false);
       }
     },
-    [] // atau tambahkan dep jika fetchRoles perlu akses ke dependen state
+    [] // tambahkan dependency jika perlu seperti token tetap
   );
 
-  const handleEdit = (role: Role) => {
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .trim();
+  };
+
+  const handleEdit = (typeOfWork: TypeOfWork) => {
     setFormData({
-      id: role.id,
-      name: role.name || "",
-      description: role.description || "",
-      permission_ids: Array.isArray(role.permissions)
-        ? role.permissions.map((p) => p.id)
-        : [],
+      id: typeOfWork.id,
+      name: typeOfWork.name || "",
+      slug: typeOfWork.slug || "",
+      description: typeOfWork.description || "",
     });
     setIsModalOpen(true);
   };
 
   const handleAdd = () => {
-    setFormData({ name: "", description: "", permission_ids: [] });
+    setFormData({ name: "", slug: "", description: "" });
     setIsModalOpen(true);
   };
 
@@ -183,16 +143,14 @@ export default function RolesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/roles/${formData.id}`
-        : "http://report-api.test/api/roles";
+        ? `http://report-api.test/api/type-of-work/${formData.id}`
+        : "http://report-api.test/api/type-of-work";
 
       // Prepare JSON payload
       const payload = {
         name: formData.name,
-        description: formData.description,
-        permission_ids: Array.isArray(formData.permission_ids)
-          ? formData.permission_ids
-          : [],
+        slug: formData.slug || generateSlug(formData.name),
+        description: formData.description || null,
       };
 
       console.log("Submitting payload:", payload); // Debug log
@@ -211,11 +169,11 @@ export default function RolesPage() {
 
       if (res.ok) {
         setIsModalOpen(false);
-        setFormData({ name: "", description: "", permission_ids: [] }); // Reset form
-        fetchRoles();
+        setFormData({ name: "", slug: "", description: "" }); // Reset form
+        fetchTypeOfWork();
         Swal.fire({
           title: "Success",
-          text: "Role has been saved",
+          text: "Type Of Work has been saved",
           icon: "success",
           timer: 2000,
           showConfirmButton: false,
@@ -239,21 +197,21 @@ export default function RolesPage() {
         } else {
           Swal.fire(
             "Error",
-            errorData.message || "Failed to save role",
+            errorData.message || "Failed to save type of work",
             "error"
           );
         }
       }
     } catch (error) {
-      console.error("Error saving role:", error);
+      console.error("Error saving type of work:", error);
       Swal.fire("Error", "Network error or server unavailable", "error");
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (slug: string) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You will not be able to recover this role!",
+      text: "You will not be able to recover this type of work!",
       icon: "warning",
       showCancelButton: true,
       background: "#111827",
@@ -271,7 +229,7 @@ export default function RolesPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/roles/${id}`, {
+        const res = await fetch(`http://report-api.test/api/type-of-work/${slug}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -280,10 +238,10 @@ export default function RolesPage() {
         });
 
         if (res.ok) {
-          fetchRoles();
+          fetchTypeOfWork();
           Swal.fire({
             title: "Deleted!",
-            text: "Role has been deleted.",
+            text: "Type Of Work has been deleted.",
             icon: "success",
             timer: 2000,
             showConfirmButton: false,
@@ -298,13 +256,13 @@ export default function RolesPage() {
           const errorData = await res.json();
           Swal.fire(
             "Error",
-            errorData.message || "Failed to delete role",
+            errorData.message || "Failed to delete type of work",
             "error"
           );
         }
       } catch (error) {
-        console.error("Error deleting role:", error);
-        Swal.fire("Error", "Failed to delete role", "error");
+        console.error("Error deleting type of work:", error);
+        Swal.fire("Error", "Failed to delete type of work", "error");
       }
     }
   };
@@ -312,7 +270,7 @@ export default function RolesPage() {
   // Multi-delete functions
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(roles.map((item) => item.id));
+      const allIds = new Set(typeOfWorks.map((item) => item.id));
       setSelectedItems(allIds);
     } else {
       setSelectedItems(new Set());
@@ -332,16 +290,16 @@ export default function RolesPage() {
   const handleMultiDelete = async () => {
     if (selectedItems.size === 0) return;
 
-    const selectedPermissions = roles.filter((cat) =>
+    const selectedTypeOfWorks = typeOfWorks.filter((cat) =>
       selectedItems.has(cat.id)
     );
-    const roleNames = selectedPermissions.map((cat) => cat.name).join(", ");
+    const typeOfWorkNames = selectedTypeOfWorks.map((cat) => cat.name).join(", ");
 
     const result = await Swal.fire({
-      title: "Delete Multiple Roles?",
+      title: "Delete Multiple Type Of Work?",
       html: `
-            <p>You are about to delete <strong>${selectedItems.size}</strong> roles:</p>
-            <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${roleNames}</p>
+            <p>You are about to delete <strong>${selectedItems.size}</strong> type of work:</p>
+            <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${typeOfWorkNames}</p>
             <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
           `,
       icon: "warning",
@@ -364,8 +322,8 @@ export default function RolesPage() {
           throw new Error("Token not found");
         }
 
-        const deletePromises = selectedPermissions.map((item) =>
-          fetch(`http://report-api.test/api/roles/${item.id}`, {
+        const deletePromises = selectedTypeOfWorks.map((item) =>
+          fetch(`http://report-api.test/api/type-of-work/${item.slug}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -384,13 +342,13 @@ export default function RolesPage() {
         const failedCount = selectedItems.size - successCount;
 
         // Refresh data
-        await fetchRoles();
+        await fetchTypeOfWork();
 
         // Show result
         if (failedCount === 0) {
           Swal.fire({
             title: "Success!",
-            text: `Successfully deleted ${successCount} roles.`,
+            text: `Successfully deleted ${successCount} type of work.`,
             icon: "success",
             timer: 3000,
             showConfirmButton: false,
@@ -404,7 +362,7 @@ export default function RolesPage() {
         } else {
           Swal.fire({
             title: "Partially Completed",
-            text: `Deleted ${successCount} roles successfully. ${failedCount} failed to delete.`,
+            text: `Deleted ${successCount} type of work successfully. ${failedCount} failed to delete.`,
             icon: "warning",
             background: "#1f2937",
             color: "#F9FAFB",
@@ -417,7 +375,7 @@ export default function RolesPage() {
         console.error("Error in multi-delete:", error);
         Swal.fire({
           title: "Error",
-          text: "Failed to delete roles. Please try again.",
+          text: "Failed to delete type of work. Please try again.",
           icon: "error",
           background: "#1f2937",
           color: "#F9FAFB",
@@ -436,41 +394,53 @@ export default function RolesPage() {
       const stored = Cookies.get("permissions");
       if (stored) {
         try {
-          setPermissions(JSON.parse(stored));
+          setUserPermissions(JSON.parse(stored));
         } catch {
-          setPermissions([]);
+          setUserPermissions([]);
         }
       }
 
       // Fetch data
-      await Promise.all([fetchRoles(), fetchPermissions()]);
+      await fetchTypeOfWork();
     };
 
     initializeData();
-  }, [fetchRoles]);
+  }, [fetchTypeOfWork]);
 
   // Search debounce
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      fetchRoles(1, searchTerm);
+      fetchTypeOfWork(1, searchTerm);
     }, 400);
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm, fetchRoles]);
+  }, [searchTerm, fetchTypeOfWork]);
+
+  // Auto-generate slug when name changes
+  useEffect(() => {
+    if (formData.name) {
+      // Only auto-generate for new positions
+      setFormData((prev) => ({
+        ...prev,
+        slug: generateSlug(prev.name),
+      }));
+    }
+  }, [formData.name, formData.id]);
 
   // Handle pagination
   const handlePageChange = useCallback(
     (page: number) => {
       if (page >= 1 && page <= totalPages) {
         setCurrentPage(page);
-        fetchRoles(page, searchTerm);
+        fetchTypeOfWork(page, searchTerm);
       }
     },
-    [searchTerm, totalPages, fetchRoles]
+    [searchTerm, totalPages, fetchTypeOfWork]
   );
 
+  // Generate pagination numbers
   const getPaginationNumbers = () => {
     const delta = 2;
     const range = [];
@@ -501,8 +471,21 @@ export default function RolesPage() {
     return rangeWithDots;
   };
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "-";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "-";
+    }
+  };
+
   const isAllSelected =
-    roles.length > 0 && roles.every((cat) => selectedItems.has(cat.id));
+    typeOfWorks.length > 0 && typeOfWorks.every((cat) => selectedItems.has(cat.id));
   const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
 
   return (
@@ -512,15 +495,15 @@ export default function RolesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="w-6 h-6" /> Roles Management
+              <Waypoints className="w-6 h-6" /> Type Of Work Management
             </h1>
             <p className="mt-1 text-sm text-gray-400">
-              Manage access roles and permissions
+              Manage organizational type of work and job roles
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {selectedItems.size > 0 && hasPermission("delete-roles") && (
+            {selectedItems.size > 0 && hasPermission("delete-type-of-work") && (
               <button
                 onClick={handleMultiDelete}
                 disabled={isDeleting}
@@ -533,12 +516,12 @@ export default function RolesPage() {
               </button>
             )}
 
-            {hasPermission("create-roles") && (
+            {hasPermission("create-type-of-work") && (
               <button
                 onClick={handleAdd}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                <Plus className="w-4 h-4 mr-2" /> Add Role
+                <Plus className="w-4 h-4 mr-2" /> Add Type Of Work
               </button>
             )}
           </div>
@@ -550,10 +533,10 @@ export default function RolesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search roles by name..."
+              placeholder="Search type of work by name ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
+              className="w-full pl-10 pr-10 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
             />
             {searchTerm && (
               <X
@@ -591,7 +574,7 @@ export default function RolesPage() {
           <table className="w-full">
             <thead className="bg-gray-800 text-white">
               <tr>
-                {hasPermission("delete-roles") && (
+                {hasPermission("delete-type-of-work") && (
                   <th className="px-6 py-3 text-left">
                     <input
                       type="checkbox"
@@ -604,14 +587,20 @@ export default function RolesPage() {
                     />
                   </th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider w-[7%]">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   No
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider w-[15%]">
-                  Role Name
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Type of work
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Permissions
+                  Slug
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Created
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                   Actions
@@ -619,16 +608,16 @@ export default function RolesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {Array.isArray(roles) &&
-                roles.map((role, index) => (
-                  <tr key={role.id} className="hover:bg-gray-800">
-                    {hasPermission("delete-roles") && (
+              {Array.isArray(typeOfWorks) &&
+                typeOfWorks.map((typeOfWork, index) => (
+                  <tr key={typeOfWork.id} className="hover:bg-gray-800">
+                    {hasPermission("delete-type-of-work") && (
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
-                          checked={selectedItems.has(role.id)}
+                          checked={selectedItems.has(typeOfWork.id)}
                           onChange={(e) =>
-                            handleSelectItem(role.id, e.target.checked)
+                            handleSelectItem(typeOfWork.id, e.target.checked)
                           }
                           className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                         />
@@ -637,40 +626,33 @@ export default function RolesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
                     </td>
-                    <td className="px-6 py-4 text-white w-[15%]">
-                      {role.name || ""}
+                    <td className="px-6 py-4 text-white font-medium">
+                      {typeOfWork.name || ""}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300">
+                      <code className="px-2 py-1 bg-gray-700 rounded text-sm">
+                        {typeOfWork.slug || ""}
+                      </code>
                     </td>
                     <td className="px-6 py-4 text-gray-300 text-sm">
-                      <div className="flex flex-wrap gap-1">
-                        {Array.isArray(role.permissions) &&
-                          role.permissions.map((p) => (
-                            <span
-                              key={p.id}
-                              className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-700 text-white"
-                            >
-                              {p.name || ""}
-                            </span>
-                          ))}
-                      </div>
+                      {typeOfWork.description || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-400 text-sm">
+                      {formatDate(typeOfWork.created_at)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* {hasPermission("show-roles") && (
-                        <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )} */}
-                        {hasPermission("update-roles") && (
+                        {hasPermission("update-type-of-work") && (
                           <button
-                            onClick={() => handleEdit(role)}
+                            onClick={() => handleEdit(typeOfWork)}
                             className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                         )}
-                        {hasPermission("delete-roles") && (
+                        {hasPermission("delete-type-of-work") && (
                           <button
-                            onClick={() => handleDelete(role.id)}
+                            onClick={() => handleDelete(typeOfWork.slug)}
                             className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -683,9 +665,11 @@ export default function RolesPage() {
             </tbody>
           </table>
 
-          {roles.length === 0 && !loading && (
+          {typeOfWorks.length === 0 && !loading && (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-lg mb-2">No roles found</div>
+              <div className="text-gray-400 text-lg mb-2">
+                No type of work found
+              </div>
               <div className="text-gray-500 text-sm">
                 {searchTerm
                   ? "Try adjusting your search criteria"
@@ -697,7 +681,7 @@ export default function RolesPage() {
           {loading && (
             <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
-              <p className="mt-4 text-gray-400">Loading roles...</p>
+              <p className="mt-4 text-gray-400">Loading Type of work...</p>
             </div>
           )}
         </div>
@@ -707,8 +691,8 @@ export default function RolesPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-400">
               Showing {(currentPage - 1) * perPage + 1} to{" "}
-              {Math.min(currentPage * perPage, totalRoles)} of {totalRoles}{" "}
-              results
+              {Math.min(currentPage * perPage, totalTypeOfWork)} of{" "}
+              {totalTypeOfWork} results
             </div>
 
             <div className="flex items-center space-x-1">
@@ -757,102 +741,78 @@ export default function RolesPage() {
       </div>
 
       {/* Modal */}
-      <Dialog.Root
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        modal={true}
-      >
+      <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
           <Dialog.Content
             className="fixed top-1/2 left-1/2 bg-gray-800 text-white rounded-lg w-[90%] max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto z-50"
-            onPointerDownOutside={(e) => e.preventDefault()}
+            onPointerDownOutside={(e) => e.preventDefault()} // <- Ini yang mencegah modal tertutup saat klik luar
           >
             {/* Header */}
             <div className="bg-blue-600 px-6 py-4 flex items-center gap-2">
-              {formData?.id ? (
+              {formData.id ? (
                 <>
                   <Pencil className="w-5 h-5 text-white" />
                   <Dialog.Title className="text-lg font-semibold text-white">
-                    Edit Role
+                    Edit Type Of Work
                   </Dialog.Title>
                 </>
               ) : (
                 <>
                   <PlusCircle className="w-5 h-5 text-white" />
                   <Dialog.Title className="text-lg font-semibold text-white">
-                    Add Role
+                    Add Type Of Work
                   </Dialog.Title>
                 </>
               )}
             </div>
 
-            {/* Body */}
             <div className="p-6 space-y-4">
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Role name"
-                className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Type Of Work
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="e.g., Senior Developer"
+                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
 
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Description"
-                className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div>
+                <label className="block text-sm font-medium mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={formData.slug}
+                  disabled={true}
+                  onChange={(e) =>
+                    setFormData({ ...formData, slug: e.target.value })
+                  }
+                  placeholder="e.g., senior-developer"
+                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Auto-generated from name, but you can customize it
+                </p>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Permissions
+                  Description (Optional)
                 </label>
-                {allPermissions.length === 0 ? (
-                  <div className="text-gray-400 text-sm">
-                    Loading permissions...
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-600 rounded p-2 bg-gray-700">
-                    {allPermissions.map((perm) => (
-                      <label
-                        key={perm.id}
-                        className="flex items-center space-x-2 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={formData.permission_ids.includes(perm.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({
-                                ...formData,
-                                permission_ids: [
-                                  ...formData.permission_ids,
-                                  perm.id,
-                                ],
-                              });
-                            } else {
-                              setFormData({
-                                ...formData,
-                                permission_ids: formData.permission_ids.filter(
-                                  (id) => id !== perm.id
-                                ),
-                              });
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <span className="text-sm text-white">
-                          {perm.name || ""}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                <textarea
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  placeholder="Brief description of this type of work"
+                  rows={3}
+                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
               </div>
             </div>
 
@@ -870,7 +830,7 @@ export default function RolesPage() {
                 disabled={!formData.name.trim()}
                 className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-white"
               >
-                {formData?.id ? (
+                {formData.id ? (
                   <>
                     <Save className="w-4 h-4" />
                     Update

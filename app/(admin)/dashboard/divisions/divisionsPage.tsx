@@ -2,7 +2,17 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { Edit, Trash2, Layers2, Plus, Search, X, Save } from "lucide-react";
+import {
+  Edit,
+  Trash2,
+  Layers2,
+  Plus,
+  Search,
+  X,
+  Save,
+  Pencil,
+  PlusCircle,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -631,11 +641,6 @@ export default function DivisionsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* {hasPermission("view-division") && (
-                        <button className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )} */}
                         {hasPermission("update-division") && (
                           <button
                             onClick={() => handleEdit(division)}
@@ -658,7 +663,6 @@ export default function DivisionsPage() {
                 ))}
             </tbody>
           </table>
-
           {divisions.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="text-gray-400 text-lg mb-2">
@@ -671,10 +675,11 @@ export default function DivisionsPage() {
               </div>
             </div>
           )}
-
+          
           {loading && (
-            <div className="py-8 text-center text-gray-400">
-              Loading divisions...
+            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+              <p className="mt-4 text-gray-400">Loading Health Divisions...</p>
             </div>
           )}
         </div>
@@ -736,13 +741,31 @@ export default function DivisionsPage() {
       {/* Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[90%] max-w-lg -translate-x-1/2 -translate-y-1/2">
-            <Dialog.Title className="text-xl font-bold mb-4">
-              {formData.id ? "Edit Division" : "Add Division"}
-            </Dialog.Title>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 bg-gray-800 text-white rounded-lg w-[90%] max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto z-50"
+            onPointerDownOutside={(e) => e.preventDefault()} // <- Ini yang mencegah modal tertutup saat klik luar
+          >
+            {/* Header */}
+            <div className="bg-blue-600 px-6 py-4 flex items-center gap-2">
+              {formData.id ? (
+                <>
+                  <Pencil className="w-5 h-5 text-white" />
+                  <Dialog.Title className="text-lg font-semibold text-white">
+                    Edit Division
+                  </Dialog.Title>
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="w-5 h-5 text-white" />
+                  <Dialog.Title className="text-lg font-semibold text-white">
+                    Add Division
+                  </Dialog.Title>
+                </>
+              )}
+            </div>
 
-            <div className="space-y-4">
+            <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Division Name
@@ -790,27 +813,28 @@ export default function DivisionsPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            {/* Footer */}
+            <div className="bg-gray-700 px-6 py-4 flex justify-end gap-2">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="inline-flex items-center px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"
+                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer flex items-center gap-2 text-white"
               >
-                <X className="w-4 h-4 mr-2" />
+                <X className="w-4 h-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={!formData.name.trim()}
-                className="inline-flex items-center px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 text-white"
               >
                 {formData.id ? (
                   <>
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save className="w-4 h-4" />
                     Update
                   </>
                 ) : (
                   <>
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="w-4 h-4" />
                     Create
                   </>
                 )}

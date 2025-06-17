@@ -23,6 +23,8 @@ import {
   Layers2,
   FileBoxIcon,
   MonitorCog,
+  Waypoints,
+  ChartNetwork,
 } from "lucide-react";
 
 interface MenuItem {
@@ -43,6 +45,12 @@ const menuItems: MenuItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Employee",
+    href: "/dashboard/employees",
+    icon: Users,
+    permissionChild: "view-employee",
   },
   {
     label: "User Management",
@@ -119,6 +127,18 @@ const menuItems: MenuItem[] = [
         href: "/dashboard/positions",
         icon: FileBoxIcon,
         permissionChild: "view-position",
+      },
+      {
+        label: "Type Of Works",
+        href: "/dashboard/type-of-works",
+        icon: Waypoints,
+        permissionChild: "view-type-of-work",
+      },
+      {
+        label: "Completion Statuses",
+        href: "/dashboard/completion-statuses",
+        icon: ChartNetwork,
+        permissionChild: "view-completion-status",
       },
     ],
   },

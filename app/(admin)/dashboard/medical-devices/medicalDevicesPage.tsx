@@ -11,6 +11,8 @@ import {
   PlusIcon,
   X,
   MonitorSmartphone,
+  Pencil,
+  PlusCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -811,8 +813,9 @@ export default function MedicalDevicesPage() {
           )}
 
           {loading && (
-            <div className="py-8 text-center text-gray-400">
-              Loading medical devices...
+            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+              <p className="mt-4 text-gray-400">Loading medical devices...</p>
             </div>
           )}
         </div>
@@ -874,13 +877,25 @@ export default function MedicalDevicesPage() {
       {/* Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[90%] max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
-            <Dialog.Title className="text-xl font-bold mb-4">
-              {formData.id ? "Edit Medical Device" : "Add Medical Device"}
-            </Dialog.Title>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 bg-gray-800 text-white rounded-lg w-[90%] max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto z-50"
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
+            {/* Header dengan ikon */}
+            <div className="bg-blue-600 px-6 py-4 rounded-t-lg flex items-center gap-2">
+              {formData.id ? (
+                <Pencil size={20} className="text-white" />
+              ) : (
+                <PlusCircle size={20} className="text-white" />
+              )}
+              <Dialog.Title className="text-xl font-bold text-white">
+                {formData.id ? "Edit Medical Device" : "Add Medical Device"}
+              </Dialog.Title>
+            </div>
 
-            <div className="space-y-4">
+            {/* Body */}
+            <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -1009,8 +1024,8 @@ export default function MedicalDevicesPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              {/* Cancel Button */}
+            {/* Footer */}
+            <div className="bg-gray-700 px-6 py-4 rounded-b-lg flex justify-end gap-2">
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"
@@ -1018,8 +1033,6 @@ export default function MedicalDevicesPage() {
                 <X size={16} />
                 Cancel
               </button>
-
-              {/* Submit Button (Create or Update) */}
               <button
                 onClick={handleSubmit}
                 disabled={
@@ -1029,7 +1042,7 @@ export default function MedicalDevicesPage() {
                   !formData.medical_device_category_id ||
                   !formData.status
                 }
-                className="flex items-center gap-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {formData.id ? (
                   <>

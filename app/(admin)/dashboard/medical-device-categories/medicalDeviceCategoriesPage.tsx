@@ -11,6 +11,8 @@ import {
   Save,
   PlusIcon,
   MonitorCog,
+  PlusCircle,
+  Pencil,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -713,8 +715,11 @@ export default function MedicalDeviceCategoriesPage() {
           )}
 
           {loading && (
-            <div className="py-8 text-center text-gray-400">
-              Loading medical device categories...
+            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+              <p className="mt-4 text-gray-400">
+                Loading medical device categories...
+              </p>
             </div>
           )}
         </div>
@@ -772,19 +777,30 @@ export default function MedicalDeviceCategoriesPage() {
           </div>
         )}
       </div>
-
       {/* Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[90%] max-w-lg -translate-x-1/2 -translate-y-1/2">
-            <Dialog.Title className="text-xl font-bold mb-4">
-              {formData.id
-                ? "Edit Medical Device Category"
-                : "Add Medical Device Category"}
-            </Dialog.Title>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 bg-gray-800 text-white rounded-lg w-[90%] max-w-2xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto z-50"
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
+            {/* Header with Icon */}
+            <div className="bg-blue-600 px-6 py-4 rounded-t-lg flex items-center gap-2">
+              {formData.id ? (
+                <Pencil size={20} className="text-white" />
+              ) : (
+                <PlusCircle size={20} className="text-white" />
+              )}
+              <Dialog.Title className="text-xl font-bold text-white">
+                {formData.id
+                  ? "Edit Medical Device Category"
+                  : "Add Medical Device Category"}
+              </Dialog.Title>
+            </div>
 
-            <div className="space-y-4">
+            {/* Body */}
+            <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Category Name
@@ -805,11 +821,12 @@ export default function MedicalDeviceCategoriesPage() {
                 <input
                   type="text"
                   value={formData.slug}
+                  disabled={true}
                   onChange={(e) =>
                     setFormData({ ...formData, slug: e.target.value })
                   }
                   placeholder="e.g., hematologi"
-                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Auto-generated from name, but you can customize it
@@ -832,7 +849,8 @@ export default function MedicalDeviceCategoriesPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            {/* Footer */}
+            <div className="bg-gray-700 px-6 py-4 rounded-b-lg flex justify-end gap-2">
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer"

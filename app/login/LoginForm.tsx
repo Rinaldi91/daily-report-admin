@@ -205,6 +205,7 @@ export default function LoginForm(): JSX.Element {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setEmail(e.target.value)
                     }
+                    suppressHydrationWarning={true}
                     onKeyPress={handleKeyPress}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 text-gray-900 placeholder-gray-500 bg-white"
                     required
@@ -239,6 +240,7 @@ export default function LoginForm(): JSX.Element {
                     required
                     disabled={isLoading}
                     autoComplete="current-password"
+                    suppressHydrationWarning={true}
                   />
                   <button
                     type="button"
@@ -270,6 +272,7 @@ export default function LoginForm(): JSX.Element {
                     }
                     className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded transition-colors duration-200"
                     disabled={isLoading}
+                    suppressHydrationWarning={true}
                   />
                   <label
                     htmlFor="remember"

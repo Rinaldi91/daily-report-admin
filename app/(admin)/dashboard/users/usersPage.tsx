@@ -21,6 +21,8 @@ import {
   CheckCircle,
   XCircle,
   Key,
+  Pencil,
+  PlusCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -884,8 +886,9 @@ export default function UsersPage() {
           )}
 
           {loading && (
-            <div className="py-8 text-center text-gray-400">
-              Loading users...
+            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+              <p className="mt-4 text-gray-400">Loading users...</p>
             </div>
           )}
         </div>
@@ -940,128 +943,155 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+      {/* modal user */}
       <Dialog.Root
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         modal={true}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
+          {/* Overlay + Blur */}
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
+
+          {/* Content */}
           <Dialog.Content
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
-            className="fixed top-1/2 left-1/2 bg-gray-800 text-white p-6 rounded-lg w-[95%] md:w-[900px] lg:w-[1000px] -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto"
+            className="fixed top-1/2 left-1/2 bg-gray-800 text-white rounded-lg w-[95%] md:w-[900px] lg:w-[1000px] -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto z-50"
           >
-            <Dialog.Title className="text-lg font-semibold mb-4">
-              {formData.id ? "Edit User" : "Add User"}
-            </Dialog.Title>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="e.g., John Doe"
-                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+            {/* Header */}
+            <div className="bg-blue-600 px-6 py-4 flex items-center gap-2 rounded-t-lg">
+              {formData.id ? (
+                <>
+                  <Pencil className="w-5 h-5 text-white" />
+                  <Dialog.Title className="text-lg font-semibold text-white">
+                    Edit User
+                  </Dialog.Title>
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="w-5 h-5 text-white" />
+                  <Dialog.Title className="text-lg font-semibold text-white">
+                    Add User
+                  </Dialog.Title>
+                </>
+              )}
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="e.g., John Doe"
+                    className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="text"
+                    name="new-email"
+                    autoComplete="off"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    placeholder="e.g., john@email.com"
+                    className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="relative">
+                  <label className="block text-sm font-medium mb-1">
+                    Password *
+                  </label>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="new-password"
+                    autoComplete="new-password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder="Enter your password"
+                    className="w-full px-3 py-2 pr-10 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute top-9 right-3 text-gray-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-sm font-medium mb-1">
+                    Confirm Password *
+                  </label>
+                  <input
+                    type={showConfirm ? "text" : "password"}
+                    value={formData.password_confirmation}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        password_confirmation: e.target.value,
+                      })
+                    }
+                    placeholder="Re-enter your password"
+                    className="w-full px-3 py-2 pr-10 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute top-9 right-3 text-gray-400 hover:text-white"
+                  >
+                    {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
-              <div>
+              <div className="mt-4">
                 <label className="block text-sm font-medium mb-1">
-                  Email *
+                  Roles *
                 </label>
-                <input
-                  type="text"
-                  name="new-email" // pakai nama tidak umum
-                  autoComplete="off"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="e.g., john@email.com"
-                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-medium mb-1">
-                  Password *
-                </label>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="new-password"
-                  autoComplete="new-password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  placeholder="Enter your password"
-                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute top-9 right-3 text-gray-400 hover:text-white cursor-pointer"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-medium mb-1">
-                  Confirm Password *
-                </label>
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  value={formData.password_confirmation}
+                <select
+                  value={formData.role_id}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      password_confirmation: e.target.value,
+                      role_id: e.target.value,
                     })
                   }
-                  placeholder="Re-enter your password"
-                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute top-9 right-3 text-gray-400 hover:text-white cursor-pointer"
+                  className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                  <option value="">Select role</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 mt-3">
-                Roles *
-              </label>
-              <select
-                value={formData.role_id}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    role_id: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            {/* Footer */}
+            <div className="bg-gray-700 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 cursor-pointer flex items-center gap-2"
+                className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 flex items-center gap-2 cursor-pointer"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -1069,7 +1099,7 @@ export default function UsersPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!formData.name.trim() || !formData.role_id}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
               >
                 {formData.id ? (
                   <>
@@ -1091,17 +1121,20 @@ export default function UsersPage() {
       <Dialog.Root open={showViewModal} onOpenChange={setShowViewModal}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200" />
-          <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] md:w-[900px] max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+          <Dialog.Content
+            className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] md:w-[900px] max-h-[90vh] animate-in fade-in zoom-in-95 duration-200"
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden h-full max-h-[90vh] flex flex-col">
               {/* Header with gradient - Fixed */}
-              <div className="bg-gradient-to-r from-blue-600 to-red-600 p-6 relative overflow-hidden flex-shrink-0">
+              <div className="bg-gradient-to-r from-blue-600 to-red-600 p-3 relative overflow-hidden flex-shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-red-600/20 backdrop-blur-3xl"></div>
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                      <User className="w-6 h-6 text-white" />
+                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                      <User className="w-5 h-5 text-white" />
                     </div>
-                    <Dialog.Title className="text-2xl font-bold text-white">
+                    <Dialog.Title className="text-xl font-bold text-white">
                       User Details
                     </Dialog.Title>
                   </div>
@@ -1266,15 +1299,7 @@ export default function UsersPage() {
               )}
 
               {/* Footer */}
-              <div className="bg-slate-800/50 border-t border-slate-700/50 p-6 flex justify-end">
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  className="px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white rounded-lg flex items-center gap-2 font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                  Close
-                </button>
-              </div>
+              <div className="bg-slate-800/50 border-t border-slate-700/50 p-3 flex justify-end"></div>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
