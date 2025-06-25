@@ -46,6 +46,7 @@ export default function EmployeesClientPage() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedDivision, setSelectedDivision] = useState<string>("");
   const [selectedPosition, setSelectedPosition] = useState<string>("");
+  const [selectedIsActive, setSelectedIsActive] = useState<string>("");
 
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string>("");
@@ -97,6 +98,7 @@ export default function EmployeesClientPage() {
         if (searchTerm.trim()) params.append("search", searchTerm);
         if (selectedDivision) params.append("division_id", selectedDivision);
         if (selectedPosition) params.append("position_id", selectedPosition);
+        if (selectedIsActive) params.append("is_active", selectedIsActive);
 
         const res = await fetch(
           `http://report-api.test/api/employee?${params.toString()}`,
@@ -125,7 +127,7 @@ export default function EmployeesClientPage() {
         setLoading(false);
       }
     },
-    [searchTerm, selectedDivision, selectedPosition]
+    [searchTerm, selectedDivision, selectedPosition, selectedIsActive]
   );
 
   const handleDelete = async (id: number) => {
@@ -283,6 +285,14 @@ export default function EmployeesClientPage() {
       setSelectedItems(new Set());
     }
   };
+  
+  // Fungsi untuk membersihkan semua filter
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setSelectedDivision("");
+    setSelectedPosition("");
+    setSelectedIsActive("");
+  };
 
   useEffect(() => {
     const initializeData = () => {
@@ -344,6 +354,9 @@ export default function EmployeesClientPage() {
     employees.length > 0 && selectedItems.size === employees.length;
   const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
 
+  // Cek apakah ada filter yang aktif
+  const isFilterActive = searchTerm || selectedDivision || selectedPosition || selectedIsActive;
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -370,7 +383,7 @@ export default function EmployeesClientPage() {
             No Employees Found
           </h3>
           <p className="text-gray-500 mt-2 max-w-sm">
-            {searchTerm || selectedDivision || selectedPosition
+            {searchTerm || selectedDivision || selectedPosition || selectedIsActive
               ? "Try adjusting your search or filter."
               : "Get started by adding a new employee."}
           </p>
@@ -587,7 +600,7 @@ export default function EmployeesClientPage() {
         <select
           value={selectedDivision}
           onChange={(e) => setSelectedDivision(e.target.value)}
-          className="w-full md:w-1/4 px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
+          className="w-full md:w-auto px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Divisions</option>
           {divisions.map((d) => (
@@ -599,7 +612,7 @@ export default function EmployeesClientPage() {
         <select
           value={selectedPosition}
           onChange={(e) => setSelectedPosition(e.target.value)}
-          className="w-full md:w-1/4 px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
+          className="w-full md:w-auto px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Positions</option>
           {positions.map((p) => (
@@ -608,6 +621,25 @@ export default function EmployeesClientPage() {
             </option>
           ))}
         </select>
+        <select
+          value={selectedIsActive}
+          onChange={(e) => setSelectedIsActive(e.target.value)}
+          className="w-full md:w-auto px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Status</option>
+          <option key={1} value={1}>{"Active"}</option>
+          <option key={0} value={0}>{"InActive"}</option>
+        </select>
+        {isFilterActive && (
+          <button
+            onClick={handleClearFilters}
+            className="flex-shrink-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-colors cursor-pointer"
+            title="Clear all filters"
+          >
+            <X className="w-4 h-4 mr-2 -ml-1" />
+            Clear
+          </button>
+        )}
       </div>
 
       {selectedItems.size > 0 && (

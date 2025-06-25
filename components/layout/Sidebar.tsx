@@ -25,6 +25,7 @@ import {
   MonitorCog,
   Waypoints,
   ChartNetwork,
+  ClipboardPlus,
 } from "lucide-react";
 
 interface MenuItem {
@@ -45,12 +46,6 @@ const menuItems: MenuItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    label: "Employee",
-    href: "/dashboard/employees",
-    icon: Users,
-    permissionChild: "view-employee",
   },
   {
     label: "User Management",
@@ -86,10 +81,10 @@ const menuItems: MenuItem[] = [
       "view-medical-device-category",
       "view-medical-device",
       "view-type-of-health-facility",
-      "view-health-facility",
-      "view-health-facility",
+      "view-type-of-work",
+      "view-completion-status",
       "view-division",
-      "view-position"
+      "view-position",
     ],
     children: [
       {
@@ -109,12 +104,6 @@ const menuItems: MenuItem[] = [
         href: "/dashboard/type-of-health-facilities",
         icon: ClipboardTypeIcon,
         permissionChild: "view-type-of-health-facility",
-      },
-      {
-        label: "Health Facilities",
-        href: "/dashboard/health-facilities",
-        icon: Hospital,
-        permissionChild: "view-health-facility",
       },
       {
         label: "Divisions",
@@ -142,6 +131,24 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
+   {
+    label: "Employee",
+    href: "/dashboard/employees",
+    icon: Users,
+    permissionChild: "view-employee",
+  },
+  {
+    label: "Health Facilities",
+    href: "/dashboard/health-facilities",
+    icon: Hospital,
+    permissionChild: "view-health-facility",
+  },
+  {
+    label: "Reports",
+    href: "/dashboard/reports",
+    icon: ClipboardPlus,
+    permissionChild: "view-report",
+  },
 ];
 
 export default function Sidebar({ isCollapsed = false }: SidebarProps) {
@@ -153,11 +160,11 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   useEffect(() => {
     const stored = Cookies.get("permissions");
     const role = Cookies.get("role"); // Tambahkan ini untuk mengambil role
-    
+
     if (stored) {
       setPermissions(JSON.parse(stored));
     }
-    
+
     if (role) {
       setUserRole(role);
     }
@@ -165,37 +172,37 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
 
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
-    
+
     // Jika user adalah super admin, berikan akses ke semua menu
     if (userRole === "super-admin" || userRole === "Super Admin") {
       return true;
     }
-    
+
     return permissions.includes(perm);
   };
 
   // Fungsi untuk mengecek apakah user memiliki salah satu dari permission header
   const hasAnyPermission = (permissionList?: string[]) => {
     if (!permissionList || permissionList.length === 0) return true;
-    
+
     // Jika user adalah super admin, berikan akses ke semua menu
     if (userRole === "super-admin" || userRole === "Super Admin") {
       return true;
     }
-    
-    return permissionList.some(permission => hasPermission(permission));
+
+    return permissionList.some((permission) => hasPermission(permission));
   };
 
   // Fungsi untuk mengecek apakah menu item memiliki children yang visible
   const hasVisibleChildren = (item: MenuItem) => {
     if (!item.children || item.children.length === 0) return false;
-    
+
     // Jika user adalah super admin, semua children akan visible
     if (userRole === "super-admin" || userRole === "Super Admin") {
       return true;
     }
-    
-    return item.children.some(child => hasPermission(child.permissionChild));
+
+    return item.children.some((child) => hasPermission(child.permissionChild));
   };
 
   // Fungsi untuk memfilter menu items berdasarkan permission
@@ -205,11 +212,13 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
       if (!item.children || item.children.length === 0) {
         return hasPermission(item.permissionChild);
       }
-      
+
       // Jika item memiliki children, cek:
       // 1. Apakah user memiliki permission untuk header (permissionHeader)
       // 2. Dan apakah ada minimal 1 child yang visible
-      return hasAnyPermission(item.permissionHeader) && hasVisibleChildren(item);
+      return (
+        hasAnyPermission(item.permissionHeader) && hasVisibleChildren(item)
+      );
     });
   };
 
@@ -370,7 +379,9 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
                       </div>
                       <div className="flex flex-col gap-1">
                         {(item.children ?? [])
-                          .filter((child) => hasPermission(child.permissionChild))
+                          .filter((child) =>
+                            hasPermission(child.permissionChild)
+                          )
                           .map((child) => {
                             const isActive = activeHref === child.href;
                             const IconComponent = child.icon;

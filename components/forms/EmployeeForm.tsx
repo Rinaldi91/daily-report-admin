@@ -31,6 +31,7 @@ export interface EmployeeFormData {
   division_id: string;
   position_id: string;
   is_active: number;
+  status: string;
   photo?: string; // Old photo filename
   photo_url?: string; // URL to display the existing photo
 }
@@ -66,6 +67,7 @@ export default function EmployeeForm({
     division_id: "",
     position_id: "",
     is_active: 1,
+    status: "",
   });
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(
@@ -169,6 +171,7 @@ export default function EmployeeForm({
             <input
               type="text"
               name="nik"
+              placeholder="e.g., 1234567890098765"
               value={formData.nik}
               onChange={handleChange}
               className={inputStyle}
@@ -182,6 +185,7 @@ export default function EmployeeForm({
             <input
               type="text"
               name="name"
+              placeholder="e.g., Jhon Doe"
               value={formData.name}
               onChange={handleChange}
               className={inputStyle}
@@ -218,6 +222,7 @@ export default function EmployeeForm({
             <input
               type="text"
               name="place_of_birth"
+              placeholder="e.g., Medan"
               value={formData.place_of_birth}
               onChange={handleChange}
               className={inputStyle}
@@ -242,6 +247,7 @@ export default function EmployeeForm({
             <input
               type="email"
               name="email"
+              placeholder="e.g., Jhon@email.com"
               value={formData.email}
               onChange={handleChange}
               className={inputStyle}
@@ -255,6 +261,7 @@ export default function EmployeeForm({
             <input
               type="tel"
               name="phone_number"
+              placeholder="e.g., 081389877896"
               value={formData.phone_number}
               onChange={handleChange}
               className={inputStyle}
@@ -266,6 +273,7 @@ export default function EmployeeForm({
             </label>
             <textarea
               name="address"
+              placeholder="e.g., Jl, Setia Luhur"
               value={formData.address}
               onChange={handleChange}
               rows={3}
@@ -300,6 +308,7 @@ export default function EmployeeForm({
             <input
               type="text"
               name="region"
+              placeholder="e.g., Medan"
               value={formData.region}
               onChange={handleChange}
               className={inputStyle}
@@ -341,6 +350,21 @@ export default function EmployeeForm({
                   {p.name}
                 </option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-300">
+               Status Employee
+            </label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className={`${inputStyle} cursor-pointer`}
+            >
+              <option value={"Training"}>Training</option>
+              <option value={"Karyawan Kontrak"}>Karyawan Kontrak</option>
+              <option value={"Karyawan Tetap"}>Karyawan Tetap</option>
             </select>
           </div>
           <div>

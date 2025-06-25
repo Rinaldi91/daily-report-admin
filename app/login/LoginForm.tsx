@@ -4,7 +4,8 @@ import { useState, useEffect, JSX } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
-import { Eye, EyeOff, LogIn, Mail, Lock, Building2 } from "lucide-react";
+import Image from "next/image"; // Import Image from next/image
+import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react"; // Remove Building2
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 
@@ -101,10 +102,17 @@ export default function LoginForm(): JSX.Element {
       setError("Login gagal. Periksa email dan password.");
 
       // ❌ Notifikasi gagal
-      MySwal.fire({
+      await MySwal.fire({
         icon: "error",
         title: "Login Failed",
         text: "Invalid email or password",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#111827",
+        color: "#F9FAFB",
+        customClass: {
+          popup: "rounded-xl",
+        },
       });
     }
   };
@@ -132,8 +140,21 @@ export default function LoginForm(): JSX.Element {
 
           {/* Logo Section */}
           <div className="text-center z-10 relative">
-            <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
-              <Building2 className="w-12 h-12 text-black" />
+            {/* <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
+              <Image
+                src="/images/logo_arbi.png"
+                alt="Logo PT. Anugerah Rezeki Bersama Indonesia"
+                width={64} // Anda bisa sesuaikan ukurannya
+                height={64} // Anda bisa sesuaikan ukurannya
+              />
+            </div> */}
+            <div className="flex items-center justify-center mx-auto mb-3">
+              <Image
+                src="/images/logo_arbi.png"
+                alt="Logo PT. Anugerah Rezeki Bersama Indonesia"
+                width={100} // Anda bisa sesuaikan ukurannya
+                height={100} // Anda bisa sesuaikan ukurannya
+              />
             </div>
 
             <h1 className="text-2xl font-bold mb-4">
