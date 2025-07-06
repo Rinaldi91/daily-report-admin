@@ -106,7 +106,7 @@ const menuItems: MenuItem[] = [
         permissionChild: "view-type-of-health-facility",
       },
       {
-        label: "Divisions",
+        label: "Departments",
         href: "/dashboard/divisions",
         icon: Layers2,
         permissionChild: "view-division",

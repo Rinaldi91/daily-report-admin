@@ -505,7 +505,7 @@ export default function ReportDetailPage() {
           {report.location && (
             <InfoCard
               icon={<MapPin className="text-blue-400 w-6 h-6" />}
-              title="Job Location"
+              title="Location"
             >
               <div className="text-sm">
                 <p className="text-gray-400 mb-1">Address:</p>

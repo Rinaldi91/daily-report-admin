@@ -465,7 +465,7 @@ export default function EmployeesClientPage() {
                           className="rounded-full object-cover"
                           src={
                             employee.photo_url ||
-                            "https://placehold.co/40x40/1f2937/F9FAFB?text=N/A"
+                            "http://report-api.test/storage/images/logos/LogoArbi.png"
                           }
                           alt={employee.name}
                           fill
@@ -602,7 +602,7 @@ export default function EmployeesClientPage() {
           onChange={(e) => setSelectedDivision(e.target.value)}
           className="w-full md:w-auto px-3 py-2 rounded bg-gray-800 border border-gray-800 text-white cursor-pointer focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">All Divisions</option>
+          <option value="">All Department</option>
           {divisions.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}

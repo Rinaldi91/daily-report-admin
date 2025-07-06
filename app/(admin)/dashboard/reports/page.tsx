@@ -1,3 +1,5 @@
+'use client';
+
 import PermissionGuard from "@/components/PermissionGuard";
 import ReportsClientPage from "./reportsPage";
 

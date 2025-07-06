@@ -316,7 +316,7 @@ export default function EmployeeForm({
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-300">
-              Division
+              Department
             </label>
             <select
               name="division_id"
@@ -325,7 +325,7 @@ export default function EmployeeForm({
               className={`${inputStyle} cursor-pointer`}
               required
             >
-              <option value="">Select Division</option>
+              <option value="">Select Department</option>
               {divisions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
