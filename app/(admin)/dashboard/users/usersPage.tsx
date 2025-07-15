@@ -361,19 +361,24 @@ export default function UsersPage() {
 
       const method = isEdit ? "PUT" : "POST";
 
-      // Buat salinan payload sebagai any agar bisa manipulasi field-nya
-      const payload: Omit<Partial<UserFormData>, "role_id"> & {
-        role_id: number;
-      } = {
-        ...formData,
+      // Buat payload
+      const payload: any = {
+        name: formData.name,
+        email: formData.email,
         role_id: parseInt(formData.role_id),
       };
 
-      if (isEdit && !formData.password) {
-        // Pastikan hanya hapus jika tidak ada isinya
-        delete payload.password;
-        delete payload.password_confirmation;
+      // Hanya tambahkan password jika diisi
+      if (formData.password && formData.password.trim() !== "") {
+        payload.password = formData.password;
+        payload.password_confirmation = formData.password_confirmation;
       }
+
+      // Debug: Log payload
+      console.log("Payload being sent:", payload);
+      console.log("Is Edit:", isEdit);
+      console.log("Selected User ID:", selectedUser?.id);
+      console.log("URL:", url);
 
       const res = await fetch(url, {
         method,
@@ -386,6 +391,10 @@ export default function UsersPage() {
       });
 
       const json = await res.json();
+
+      // Debug: Log response
+      console.log("Response:", json);
+      console.log("Status:", res.status);
 
       if (res.ok) {
         await fetchUsers(currentPage, searchTerm);
@@ -408,6 +417,10 @@ export default function UsersPage() {
           Object.values(json.errors || {})
             .flat()
             .join("\n") || json.message;
+
+        // Debug: Log error details
+        // console.error("Error details:", json.errors);
+
         Swal.fire({
           title: "Warning",
           text: errorText,
@@ -423,7 +436,7 @@ export default function UsersPage() {
         });
       }
     } catch (err) {
-      console.log("err", err);
+      console.error("Submit error:", err);
       Swal.fire({
         title: "Warning",
         text: "Failed to save user",
@@ -443,13 +456,15 @@ export default function UsersPage() {
   };
 
   const handleEditUser = (users: User) => {
+    console.log("Editing user:", users); // Debug
+    setSelectedUser(users); // Make sure selectedUser is set
     setFormData({
       id: users.id.toString(),
       role_id: users.role_id.toString(),
       name: users.name || "",
       email: users.email || "",
-      password: users.password || "",
-      password_confirmation: users.password_confirmation || "",
+      password: "", // Always empty for edit
+      password_confirmation: "", // Always empty for edit
     });
     setIsModalOpen(true);
   };

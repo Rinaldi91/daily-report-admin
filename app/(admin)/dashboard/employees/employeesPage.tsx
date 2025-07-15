@@ -528,7 +528,7 @@ export default function EmployeesClientPage() {
                       {hasPermission("delete-employee") && (
                         <button
                           onClick={() => handleDelete(employee.id)}
-                          className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                          className="text-red-400 hover:text-red-300 p-1 cursor-pointer hidden"
                           title="Delete Employee"
                         >
                           <Trash2 className="w-4 h-4" />

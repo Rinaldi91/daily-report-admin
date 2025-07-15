@@ -494,7 +494,7 @@ export default function DivisionsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Layers2 className="w-6 h-6" /> Divisions Management
+              <Layers2 className="w-6 h-6" />Department Management
             </h1>
             <p className="mt-1 text-sm text-gray-400">
               Manage organizational divisions and departments

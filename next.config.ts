@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       {
         protocol: "http", // atau 'http' jika perlu
         hostname: "report-api.test", // <-- Ganti dengan domain gambar Anda (mis: s3.amazonaws.com)
+        port:'',
         pathname: "/storage/**",
       },
     ],

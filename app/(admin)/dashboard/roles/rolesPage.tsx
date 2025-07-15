@@ -646,7 +646,7 @@ export default function RolesPage() {
                           role.permissions.map((p) => (
                             <span
                               key={p.id}
-                              className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-700 text-white"
+                              className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-800 text-400 text-white"
                             >
                               {p.name || ""}
                             </span>

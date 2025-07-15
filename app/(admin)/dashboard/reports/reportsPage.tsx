@@ -19,6 +19,7 @@ import {
   CalendarRange,
   Calendar,
   FileSpreadsheet,
+  Printer, // <-- Import Printer icon
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -154,6 +155,7 @@ export default function ReportsClientPage() {
   const [endDate, setEndDate] = useState<string>("");
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false); // <-- State for printing
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
@@ -293,6 +295,9 @@ export default function ReportsClientPage() {
     initializeData();
   }, [fetchReports]);
 
+  const [activeDateFilter, setActiveDateFilter] = useState<
+    "today" | "week" | "month" | "year" | null
+  >(null);
   const setDateFilter = (range: "today" | "week" | "month" | "year") => {
     const today = new Date();
     let start, end;
@@ -405,7 +410,8 @@ export default function ReportsClientPage() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm, fetchReports]);
+  }, [searchTerm, fetchReports, startDate, endDate]);
+
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -413,8 +419,9 @@ export default function ReportsClientPage() {
         fetchReports(page, searchTerm, startDate, endDate);
       }
     },
-    [searchTerm, totalPages, fetchReports]
+    [searchTerm, startDate, endDate, totalPages, fetchReports]
   );
+
 
   const getPaginationNumbers = () => {
     const delta = 2;
@@ -579,7 +586,7 @@ export default function ReportsClientPage() {
                         {hasPermission("delete-report") && (
                           <button
                             onClick={() => handleDelete(report.id)}
-                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer hidden"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -639,6 +646,118 @@ export default function ReportsClientPage() {
       </>
     );
   };
+
+    const handlePrint = async () => {
+    setIsPrinting(true);
+    try {
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Unauthorized");
+
+        const params = new URLSearchParams();
+        // Use the main page filters for printing
+        if (searchTerm.trim()) params.append("search", searchTerm);
+        // Use startDate and endDate from the main filter, not the modal's filter
+        if (startDate) params.append("start_date", startDate);
+        if (endDate) params.append("end_date", endDate);
+        // Note: The API must support fetching all records when no page is specified,
+        // or you must loop through all pages. We'll assume the API endpoint
+        // `report-all` is suitable for this.
+        const res = await fetch(
+            `http://report-api.test/api/report-all?${params.toString()}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/json",
+                },
+            }
+        );
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.message || "Failed to fetch data for printing");
+        }
+
+        const json = await res.json();
+        const allReports: FullReport[] = Array.isArray(json.data)
+            ? json.data
+            : Array.isArray(json.data.data)
+            ? json.data.data
+            : [];
+
+
+        if (allReports.length === 0) {
+            Swal.fire("No Data", "No data matches the selected filters to print.", "info");
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Print Reports</title>
+                        <style>
+                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; color: #333; }
+                            table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+                            th, td { padding: 0.75rem; text-align: left; border: 1px solid #dee2e6; }
+                            thead th { background-color: #f8f9fa; border-bottom-width: 2px; }
+                            h1 { text-align: center; margin-bottom: 20px; }
+                            .print-header { display: none; }
+                            @media print {
+                                .no-print { display: none; }
+                                h1 { display: block; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Report Data</h1>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Report Number</th>
+                                    <th>Health Facility</th>
+                                    <th>Employee</th>
+                                    <th>Status</th>
+                                    <th>Date Completed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${allReports.map((report, index) => `
+                                    <tr>
+                                        <td>${index + 1}</td>
+                                        <td>${report.report_number}</td>
+                                        <td>${report.health_facility?.name ?? '-'}</td>
+                                        <td>${report.employee?.name ?? '-'}</td>
+                                        <td>${report.is_status}</td>
+                                        <td>${report.completed_at ? format(new Date(report.completed_at), 'dd-MM-yyyy HH:mm') : '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <script>
+                            window.onload = function() {
+                                window.print();
+                                window.onafterprint = function() {
+                                  window.close();
+                                }
+                            };
+                        </script>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    } catch (err: unknown) {
+        Swal.fire({
+            title: "Print Failed",
+            text: err instanceof Error ? err.message : "An unexpected error occurred.",
+            icon: "error",
+        });
+    } finally {
+        setIsPrinting(false);
+    }
+};
 
   const handleExport = async (format: "xlsx" | "csv" | "json") => {
     setIsExporting(true);
@@ -746,7 +865,7 @@ export default function ReportsClientPage() {
     reports.forEach((report) => {
       if (report.report_work_item && report.report_work_item.length > 0) {
         report.report_work_item.forEach((item) => {
-          // Find the corresponding medical device for this work item [cite: 24, 90]
+          // Find the corresponding medical device for this work item
           const device = report.health_facility.medical_devices.find(
             (d) => d.id === item.medical_device_id
           );
@@ -754,52 +873,52 @@ export default function ReportsClientPage() {
           // Objek yang di-push harus sesuai dengan interface FlatReportData.
           // Gunakan operator '??' atau '||' untuk memberikan nilai default jika data null/undefined.
           flatData.push({
-            "Report Number": report.report_number, // [cite: 2]
-            Status: report.is_status, // [cite: 2]
-            "Date Completed": report.completed_at ?? "-", // [cite: 3]
-            "Total Time": report.total_time ?? "-", // [cite: 3]
-            "Employee Name": report.employee?.name ?? "-", // [cite: 6]
-            "Employee Number": report.employee?.employee_number ?? "-", // [cite: 5]
-            "Health Facility": report.health_facility?.name ?? "-", // [cite: 10]
-            "Facility Type": report.health_facility?.type?.name ?? "-", // [cite: 13]
-            City: report.health_facility?.city ?? "-", // [cite: 11, 45, 86]
-            "Facility Address": report.health_facility?.address ?? "-", // [cite: 11, 12, 45]
-            "Job Order": item.job_order ?? "-", // [cite: 26]
+            "Report Number": report.report_number,
+            Status: report.is_status,
+            "Date Completed": report.completed_at ?? "-",
+            "Total Time": report.total_time ?? "-",
+            "Employee Name": report.employee?.name ?? "-",
+            "Employee Number": report.employee?.employee_number ?? "-",
+            "Health Facility": report.health_facility?.name ?? "-",
+            "Facility Type": report.health_facility?.type?.name ?? "-",
+            City: report.health_facility?.city ?? "-",
+            "Facility Address": report.health_facility?.address ?? "-",
+            "Job Order": item.job_order ?? "-",
             "Type of Work":
               item.report_work_item_type
                 .map((t) => t.type_of_work.name)
-                .join(", ") || "-", // [cite: 30, 71]
-            Problem: item.problem ?? "-", // [cite: 24]
-            "Error Code": item.error_code ?? "-", // [cite: 24]
-            "Job Action": item.job_action ?? "-", // [cite: 25]
-            "Work Item Note": item.note ?? "-", // [cite: 26]
-            "Device Brand": device?.brand ?? "-", // [cite: 16, 49, 91]
-            "Device Model": device?.model ?? "-", // [cite: 16, 49, 91]
-            "Device Serial Number": device?.serial_number ?? "-", // [cite: 16, 50, 91]
-            "Device Category": device?.medical_device_category?.name ?? "-", // [cite: 20, 54, 96]
-            "Customer Name": report.customer_name ?? "-", // [cite: 2]
-            "Customer Phone": report.customer_phone ?? "-", // [cite: 2]
-            "Report Note": report.note ?? "-", // [cite: 3]
-            Suggestion: report.suggestion ?? "-", // [cite: 3]
-            "Location Address": report.location?.address ?? "-", // [cite: 34, 75]
-            Latitude: report.location?.latitude ?? "-", // [cite: 34, 75]
-            Longitude: report.location?.longitude ?? "-", // [cite: 34, 75]
+                .join(", ") || "-",
+            Problem: item.problem ?? "-",
+            "Error Code": item.error_code ?? "-",
+            "Job Action": item.job_action ?? "-",
+            "Work Item Note": item.note ?? "-",
+            "Device Brand": device?.brand ?? "-",
+            "Device Model": device?.model ?? "-",
+            "Device Serial Number": device?.serial_number ?? "-",
+            "Device Category": device?.medical_device_category?.name ?? "-",
+            "Customer Name": report.customer_name ?? "-",
+            "Customer Phone": report.customer_phone ?? "-",
+            "Report Note": report.note ?? "-",
+            Suggestion: report.suggestion ?? "-",
+            "Location Address": report.location?.address ?? "-",
+            Latitude: report.location?.latitude ?? "-",
+            Longitude: report.location?.longitude ?? "-",
           });
         });
       } else {
         // Jika tidak ada work item, buat baris kosong yang sesuai dengan struktur
         // untuk menjaga konsistensi kolom di file Excel/CSV.
         flatData.push({
-          "Report Number": report.report_number, // [cite: 2]
+          "Report Number": report.report_number,
           Status: "No work items found",
-          "Date Completed": report.completed_at ?? "-", // [cite: 3]
-          "Total Time": report.total_time ?? "-", // [cite: 3]
-          "Employee Name": report.employee?.name ?? "-", // [cite: 6]
-          "Employee Number": report.employee?.employee_number ?? "-", // [cite: 5]
-          "Health Facility": report.health_facility?.name ?? "-", // [cite: 10]
-          "Facility Type": report.health_facility?.type?.name ?? "-", // [cite: 13]
-          City: report.health_facility?.city ?? "-", // [cite: 11, 45, 86]
-          "Facility Address": report.health_facility?.address ?? "-", // [cite: 11, 12, 45]
+          "Date Completed": report.completed_at ?? "-",
+          "Total Time": report.total_time ?? "-",
+          "Employee Name": report.employee?.name ?? "-",
+          "Employee Number": report.employee?.employee_number ?? "-",
+          "Health Facility": report.health_facility?.name ?? "-",
+          "Facility Type": report.health_facility?.type?.name ?? "-",
+          City: report.health_facility?.city ?? "-",
+          "Facility Address": report.health_facility?.address ?? "-",
           "Job Order": "-",
           "Type of Work": "-",
           Problem: "-",
@@ -810,18 +929,30 @@ export default function ReportsClientPage() {
           "Device Model": "-",
           "Device Serial Number": "-",
           "Device Category": "-",
-          "Customer Name": report.customer_name ?? "-", // [cite: 2]
-          "Customer Phone": report.customer_phone ?? "-", // [cite: 2]
-          "Report Note": report.note ?? "-", // [cite: 3]
-          Suggestion: report.suggestion ?? "-", // [cite: 3]
-          "Location Address": report.location?.address ?? "-", // [cite: 34, 75]
-          Latitude: report.location?.latitude ?? "-", // [cite: 34, 75]
-          Longitude: report.location?.longitude ?? "-", // [cite: 34, 75]
+          "Customer Name": report.customer_name ?? "-",
+          "Customer Phone": report.customer_phone ?? "-",
+          "Report Note": report.note ?? "-",
+          Suggestion: report.suggestion ?? "-",
+          "Location Address": report.location?.address ?? "-",
+          Latitude: report.location?.latitude ?? "-",
+          Longitude: report.location?.longitude ?? "-",
         });
       }
     });
 
     return flatData;
+  };
+
+  const handleCloseAndClearFilters = () => {
+    // 1. Reset all filter states to their initial values
+    setFilterUser("");
+    setSearchQuery("");
+    setActiveDateFilter(null); // Or whatever your initial state is, e.g., "today"
+    setFilterStartDate(""); // Reset start date
+    setFilterEndDate(""); // Reset end date
+
+    // 2. Close the modal
+    setIsExportModalOpen(false);
   };
 
   return (
@@ -846,6 +977,15 @@ export default function ReportsClientPage() {
               </Link>
             )} */}
             {hasPermission("export-excel") && (
+             <>
+               <button
+                onClick={handlePrint}
+                disabled={isPrinting}
+                className="inline-flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                {isPrinting ? "Printing..." : "Print"}
+              </button>
               <button
                 onClick={() => setIsExportModalOpen(true)}
                 className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
@@ -853,6 +993,7 @@ export default function ReportsClientPage() {
                 <Download className="w-4 h-4 mr-2" />
                 Export Data
               </button>
+             </>
             )}
           </div>
         </div>
@@ -963,8 +1104,9 @@ export default function ReportsClientPage() {
           <div className="bg-gray-900 rounded-lg p-8 w-full max-w-2xl space-y-6 text-white border border-gray-700">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Export Reports</h2>
+              {/* --- MODIFIED BUTTON --- */}
               <button
-                onClick={() => setIsExportModalOpen(false)}
+                onClick={handleCloseAndClearFilters} // Use the new handler function here
                 className="text-gray-400 hover:text-white"
               >
                 <X className="w-6 h-6 cursor-pointer" />
@@ -975,7 +1117,7 @@ export default function ReportsClientPage() {
             <div>
               <label
                 htmlFor="userFilter"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="block text-sm font-medium text-gray-300 mb-5"
               >
                 Filter By Employee
               </label>
@@ -992,7 +1134,7 @@ export default function ReportsClientPage() {
                         ? employees.find(
                             (emp) => emp.id.toString() === filterUser
                           )?.name
-                        : "Select employee..."}
+                        : "All Employees..."}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </button>
@@ -1003,7 +1145,7 @@ export default function ReportsClientPage() {
                     sideOffset={5}
                     align="start"
                     className="w-[607px] items-center rounded-md border border-gray-700 bg-gray-800 p-1 text-white shadow-md z-50"
-                    onCloseAutoFocus={(e) => e.preventDefault()} // Mencegah fokus kembali ke tombol trigger
+                    onCloseAutoFocus={(e) => e.preventDefault()}
                   >
                     {/* --- KOTAK PENCARIAN BARU --- */}
                     <div className="p-2">
@@ -1075,29 +1217,57 @@ export default function ReportsClientPage() {
               </label>
               <div className="flex gap-2 mb-3">
                 <button
-                  onClick={() => setDateFilter("today")}
-                  className="flex-1 px-3 py-1.5 bg-gray-700 rounded-md hover:bg-gray-600 text-sm cursor-pointer flex items-center justify-center"
+                  onClick={() => {
+                    setDateFilter("today");
+                    setActiveDateFilter("today");
+                  }}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm cursor-pointer flex items-center justify-center transition-colors ${
+                    activeDateFilter === "today"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-gray-700 hover:bg-gray-600"
+                  }`}
                 >
                   <CalendarDays className="w-4 h-4 mr-2" />
                   Hari Ini
                 </button>
                 <button
-                  onClick={() => setDateFilter("week")}
-                  className="flex-1 px-3 py-1.5 bg-gray-700 rounded-md hover:bg-gray-600 text-sm cursor-pointer flex items-center justify-center"
+                  onClick={() => {
+                    setDateFilter("week");
+                    setActiveDateFilter("week");
+                  }}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm cursor-pointer flex items-center justify-center transition-colors ${
+                    activeDateFilter === "week"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-gray-700 hover:bg-gray-600"
+                  }`}
                 >
                   <CalendarRange className="w-4 h-4 mr-2" />
                   This Week
                 </button>
                 <button
-                  onClick={() => setDateFilter("month")}
-                  className="flex-1 px-3 py-1.5 bg-gray-700 rounded-md hover:bg-gray-600 text-sm cursor-pointer flex items-center justify-center"
+                  onClick={() => {
+                    setDateFilter("month");
+                    setActiveDateFilter("month");
+                  }}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm cursor-pointer flex items-center justify-center transition-colors ${
+                    activeDateFilter === "month"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-gray-700 hover:bg-gray-600"
+                  }`}
                 >
                   <Calendar className="w-4 h-4 mr-2" />
                   This Month
                 </button>
                 <button
-                  onClick={() => setDateFilter("year")}
-                  className="flex-1 px-3 py-1.5 bg-gray-700 rounded-md hover:bg-gray-600 text-sm cursor-pointer flex items-center justify-center"
+                  onClick={() => {
+                    setDateFilter("year");
+                    setActiveDateFilter("year");
+                  }}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm cursor-pointer flex items-center justify-center transition-colors ${
+                    activeDateFilter === "year"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-gray-700 hover:bg-gray-600"
+                  }`}
                 >
                   <Calendar className="w-4 h-4 mr-2" />
                   This Year

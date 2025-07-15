@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import Cookies from "js-cookie";
 import {
   BarChart,
@@ -9,554 +9,630 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
   Legend,
 } from "recharts";
-import { LayoutDashboard } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Clock,
+  FileText,
+  Wrench,
+  ChevronDown,
+  Building2,
+} from "lucide-react";
 
-const chartData = [
-  { name: "Jan", Sales: 1200 },
-  { name: "Feb", Sales: 2100 },
-  { name: "Mar", Sales: 800 },
-  { name: "Apr", Sales: 1600 },
-];
-
-const donutData = [
-  { name: "Service A", value: 35 },
-  { name: "Service B", value: 45 },
-  { name: "Service C", value: 20 },
-];
-
-const COLORS = ["#00bcd4", "#f43f5e", "#f59e0b"];
-
-type Permission = {
+// --- [TIPE DATA TIDAK BERUBAH] ---
+interface Permission {
   id: number;
   name: string;
   slug: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-  pivot?: {
-    role_id: number;
-    permission_id: number;
-  };
-};
-
-type Role = {
+}
+interface Role {
   id: number;
   name: string;
   slug: string;
   description: string;
-  created_at: string;
-  updated_at: string;
   permissions: Permission[];
-};
-
-type User = {
+}
+interface User {
   id: number;
   name: string;
   email: string;
-  role_id: number;
   email_verified_at: string;
   created_at: string;
   updated_at: string;
   role: Role;
-};
-
-type ApiResponse = {
+}
+interface ApiResponse {
   status: boolean;
   message: string;
   data: User;
+}
+interface DashboardStats {
+  total_facilities: number;
+  total_reports: number;
+  progress_reports: number;
+  completed_reports: number;
+  total_engineers: number;
+}
+interface ReportVolumeData {
+  day: string;
+  reports: number;
+}
+interface UserReportStats {
+  user_name: string;
+  report_count: number;
+}
+interface HealthFacility {
+  id: number;
+  name: string;
+  city: string;
+  type_of_health_facility_id: number;
+}
+interface HealthFacilityType {
+    id: number;
+    name: string;
+}
+
+// --- KOMPONEN SELECT KUSTOM ---
+interface CustomSelectOption {
+    value: string;
+    label: string;
+}
+
+const CustomScrollSelect = ({
+    options,
+    value,
+    onChange,
+    placeholder
+}: {
+    options: CustomSelectOption[];
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectRef = useRef<HTMLDivElement>(null);
+    const selectedOption = options.find(opt => opt.value === value);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div ref={selectRef} className="relative w-48">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center justify-between w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+                <span>{selectedOption ? selectedOption.label : placeholder}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg">
+                    <ul className="py-1" style={{ maxHeight: '9rem', overflowY: 'auto' }}>
+                        {options.map(option => (
+                            <li
+                                key={option.value}
+                                onClick={() => {
+                                    onChange(option.value);
+                                    setIsOpen(false);
+                                }}
+                                className="px-3 py-2 text-sm text-white hover:bg-sky-500/20 cursor-pointer"
+                            >
+                                {option.label}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
 };
 
-// Utility function to get data from cookies
-const getUserDataFromCookies = (): {
-  user: User | null;
-  token: string | null;
-  permissions: string[];
-} => {
+
+// --- FUNGSI HELPER ---
+const getUserDataFromCookies = (): { user: User | null; token: string | null; } => {
   try {
-    const token = Cookies.get("token") || null; // Convert undefined to null
+    const token = Cookies.get("token") || null;
     const userCookie = Cookies.get("user");
-    const permissionsCookie = Cookies.get("permissions");
-
-    let user: User | null = null;
-    let permissions: string[] = [];
-
-    if (userCookie) {
-      user = JSON.parse(userCookie);
-    }
-
-    if (permissionsCookie) {
-      permissions = JSON.parse(permissionsCookie);
-    }
-
-    return { user, token, permissions };
+    const user: User | null = userCookie ? JSON.parse(userCookie) : null;
+    return { user, token };
   } catch (error) {
     console.error("Error parsing cookie data:", error);
-    return { user: null, token: null, permissions: [] };
+    return { user: null, token: null };
   }
 };
 
-// Function to fetch fresh user data from API
 const fetchUserProfile = async (token: string): Promise<User | null> => {
   try {
-    console.log("🚀 Fetching fresh user data from API");
-
     const response = await fetch("http://report-api.test/api/profile", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
-
-    console.log("📡 API Response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ API Error Response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
+    if (!response.ok) return null;
     const result: ApiResponse = await response.json();
-    console.log("✅ Fresh API Response:", result);
-
-    if (result.status && result.data) {
-      return result.data;
-    } else {
-      throw new Error(result.message || "Failed to fetch user data");
-    }
+    return result.status && result.data ? result.data : null;
   } catch (error) {
-    console.error("❌ Error fetching user profile:", error);
+    console.error("Error fetching user profile:", error);
     return null;
   }
 };
 
+
+// --- KOMPONEN UTAMA ---
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [reportVolume, setReportVolume] = useState<ReportVolumeData[]>([]);
+  const [userStats, setUserStats] = useState<UserReportStats[]>([]);
+  const [healthFacilities, setHealthFacilities] = useState<HealthFacility[]>([]);
+  const [healthFacilityTypes, setHealthFacilityTypes] = useState<HealthFacilityType[]>([]);
+  const [selectedFacilityType, setSelectedFacilityType] = useState<string>("");
+
+
   const [dataSource, setDataSource] = useState<"cookie" | "api" | "fallback">(
     "cookie"
   );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+
+  // --- LOGIKA FETCH DATA ---
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const { user: cookieUser, token } = getUserDataFromCookies();
+
+    if (cookieUser) {
+      setUser(cookieUser);
+      setDataSource("cookie");
+    }
+
+    if (token) {
+      try {
+        const [
+            freshUser,
+            statsRes,
+            volumeRes,
+            userStatsRes,
+            healthFacilitiesRes,
+            facilityTypesRes
+        ] =
+          await Promise.all([
+            fetchUserProfile(token),
+            fetch("http://report-api.test/api/dashboard/stats", {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(
+              `http://report-api.test/api/dashboard/report-volume?year=${selectedYear}&month=${selectedMonth}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            ),
+            fetch(
+              "http://report-api.test/api/dashboard/reports/stats-by-user",
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            ),
+            fetch(
+                "http://report-api.test/api/dashboard/health-facility?all_health_facilities=true",
+                { headers: { Authorization: `Bearer ${token}` } }
+            ),
+            fetch(
+                "http://report-api.test/api/type-of-health-facility?per_page=All",
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+          ]);
+
+        if (freshUser) {
+          setUser(freshUser);
+          setDataSource("api");
+          Cookies.set("user", JSON.stringify(freshUser), { expires: 1 });
+        }
+
+        const statsData = await statsRes.json();
+        if (statsData.data) setStats(statsData.data);
+
+        const volumeData = await volumeRes.json();
+        if (volumeData.data) setReportVolume(volumeData.data);
+
+        const userStatsData = await userStatsRes.json();
+        if (userStatsData.data) setUserStats(userStatsData.data);
+
+        const healthFacilitiesData = await healthFacilitiesRes.json();
+        if (healthFacilitiesData.data) setHealthFacilities(healthFacilitiesData.data);
+
+        const facilityTypesData = await facilityTypesRes.json();
+        if (facilityTypesData.data) setHealthFacilityTypes(facilityTypesData.data);
+
+
+      } catch (err) {
+        setError("Failed to fetch live data. Displaying cached information.");
+      }
+    } else {
+      setError("Authentication required. Please login.");
+    }
+
+    setLoading(false);
+  }, [selectedYear, selectedMonth]);
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    loadData();
+  }, [loadData]);
 
-        // 1. First, try to get data from cookies (faster)
-        const {
-          user: cookieUser,
-          token,
-          permissions,
-        } = getUserDataFromCookies();
+  // Opsi untuk filter dropdown
+  const years = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i),
+    []
+  );
+  const months = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        value: i + 1,
+        name: new Date(0, i).toLocaleString("id-ID", { month: "long" }),
+      })),
+    []
+  );
 
-        console.log("🍪 Cookie data:", {
-          hasUser: !!cookieUser,
-          hasToken: !!token,
-          permissionsCount: permissions.length,
-        });
+  const facilityTypeOptions = useMemo(() => {
+        const defaultOption = { value: "", label: "All Types" };
+        const otherOptions = healthFacilityTypes.map(type => ({ value: String(type.id), label: type.name }));
+        return [defaultOption, ...otherOptions];
+    }, [healthFacilityTypes]);
 
-        if (cookieUser && token) {
-          // Set cookie data immediately for fast loading
-          setUser(cookieUser);
-          setDataSource("cookie");
-          setLoading(false);
+  // Transform user stats data for pie chart
+  const pieChartData = useMemo(() => {
+    return userStats.map((item) => ({
+      name: item.user_name,
+      value: item.report_count,
+    }));
+  }, [userStats]);
 
-          // 2. Then try to fetch fresh data from API (background update)
-          try {
-            const freshUser = await fetchUserProfile(token);
-            if (freshUser) {
-              console.log("🔄 Updating with fresh API data");
-              setUser(freshUser);
-              setDataSource("api");
+    const healthFacilityChartData = useMemo(() => {
+        const filteredFacilities = selectedFacilityType
+            ? healthFacilities.filter(facility => facility.type_of_health_facility_id === Number(selectedFacilityType))
+            : healthFacilities;
 
-              // Update cookies with fresh data
-              Cookies.set("user", JSON.stringify(freshUser), { expires: 1 });
+        const countByCity = filteredFacilities.reduce((acc, facility) => {
+            acc[facility.city] = (acc[facility.city] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
 
-              // Update permissions if available
-              if (freshUser.role?.permissions) {
-                const permissionSlugs = freshUser.role.permissions.map(
-                  (p) => p.slug
-                );
-                Cookies.set("permissions", JSON.stringify(permissionSlugs), {
-                  expires: 1,
-                });
-              }
-            }
-          } catch (apiError) {
-            console.warn(
-              "⚠️ Failed to fetch fresh data, using cookie data:",
-              apiError
-            );
-            setError("Using cached data. Could not fetch latest updates.");
-          }
-        } else if (token) {
-          // 3. If no user in cookie but token exists, fetch from API
-          console.log("🔍 No user in cookies, fetching from API...");
-          const apiUser = await fetchUserProfile(token);
+        return Object.entries(countByCity).map(([cityName, count]) => ({
+            name: cityName,
+            value: count,
+        }));
+    }, [healthFacilities, selectedFacilityType]);
+    
+    const totalHealthFacilities = useMemo(() => healthFacilityChartData.reduce((sum, item) => sum + item.value, 0), [healthFacilityChartData]);
 
-          if (apiUser) {
-            setUser(apiUser);
-            setDataSource("api");
 
-            // Save to cookies for next time
-            Cookies.set("user", JSON.stringify(apiUser), { expires: 1 });
-            if (apiUser.role?.permissions) {
-              const permissionSlugs = apiUser.role.permissions.map(
-                (p) => p.slug
-              );
-              Cookies.set("permissions", JSON.stringify(permissionSlugs), {
-                expires: 1,
-              });
-            }
-          } else {
-            throw new Error("Failed to fetch user data from API");
-          }
-        } else {
-          // 4. No token found, user needs to login
-          console.warn("❌ No authentication token found");
-          setError("Please login to access dashboard");
-          setDataSource("fallback");
+  // Colors for pie chart
+  const COLORS = [
+    "#38bdf8",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4",
+    "#84cc16",
+    "#f97316",
+    "#ec4899",
+    "#6366f1",
+  ];
 
-          // Redirect to login or show login prompt
-          // window.location.href = '/login';
-        }
-      } catch (err) {
-        console.error("Failed to load user data:", err);
-        setError("Failed to load user data. Please try refreshing the page.");
-        setDataSource("fallback");
-
-        // Fallback user for development
-        setUser({
-          id: 0,
-          name: "Guest User",
-          email: "guest@example.com",
-          role_id: 1,
-          email_verified_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          role: {
-            id: 1,
-            name: "Guest",
-            slug: "guest",
-            description: "Guest role",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            permissions: [],
-          },
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
-  // Show loading state
-  if (loading) {
+  if (loading && !user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh]">
+      <div className="flex flex-col items-center justify-center min-h-[90vh] bg-gray-900 rounded-lg">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
-        <p className="mt-4 text-gray-400">Loading data...</p>
+        <p className="mt-4 text-gray-400">Loading dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Error notification */}
-      {error && (
-        <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-lg mb-4">
-          <div className="flex items-center">
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            {error}
-          </div>
-        </div>
-      )}
-
-      {/* Data source indicator */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <LayoutDashboard className="w-6 h-6" />
-            Dashboard
-          </h1>
-          <p className="text-white/80 mt-1 flex items-center gap-2">
-            <span className="text-lg">👋</span>
-            Welcome Back, {user?.name || "User"}!
-          </p>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="text-white/60 text-sm">
-              Role: {user?.role?.name}
-            </span>
-            <span className="text-white/60 text-sm">•</span>
-            <span className="text-white/60 text-sm">ID: {user?.id}</span>
-            <span className="text-white/60 text-sm">•</span>
-            <span className="text-white/60 text-sm">
-              Permissions: {user?.role?.permissions?.length || 0}
-            </span>
-            <span className="text-white/60 text-sm">•</span>
-            <span
-              className={`text-xs px-2 py-1 rounded ${
-                dataSource === "api"
-                  ? "bg-green-500/20 text-green-300"
-                  : dataSource === "cookie"
-                  ? "bg-blue-500/20 text-blue-300"
-                  : "bg-gray-500/20 text-gray-300"
-              }`}
-            >
-              {dataSource === "api"
-                ? "🔄 Live Data"
-                : dataSource === "cookie"
-                ? "🍪 Cached"
-                : "👤 Guest"}
-            </span>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-white/60 text-sm">Email</div>
-          <div className="text-white text-sm">{user?.email}</div>
-          {user?.email_verified_at && (
-            <div className="text-green-400 text-xs mt-1">✓ Verified</div>
-          )}
-        </div>
-      </div>
-
-      {/* User Info Card */}
-      <div className="bg-white/10 backdrop-blur-sm border border-white/20 p-4 rounded-lg">
-        <h3 className="text-white font-medium mb-2">User Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-white/60">Created:</span>
-            <div className="text-white">
-              {user?.created_at
-                ? new Date(user.created_at).toLocaleDateString("id-ID", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "N/A"}
-            </div>
-          </div>
-          <div>
-            <span className="text-white/60">Last Updated:</span>
-            <div className="text-white">
-              {user?.updated_at
-                ? new Date(user.updated_at).toLocaleDateString("id-ID", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "N/A"}
-            </div>
-          </div>
-          <div>
-            <span className="text-white/60">Role Description:</span>
-            <div className="text-white">
-              {user?.role?.description || "No description"}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Permissions Card */}
-      {/* {user?.role?.permissions && user.role.permissions.length > 0 && (
-        <div className="bg-white/10 backdrop-blur-sm border border-white/20 p-4 rounded-lg">
-          <h3 className="text-white font-medium mb-2">Your Permissions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-            {user.role.permissions.map((permission) => (
-              <div
-                key={permission.id}
-                className="bg-white/5 px-3 py-2 rounded text-sm border border-white/10"
-              >
-                <div className="text-white font-medium">{permission.name}</div>
-                <div className="text-white/60 text-xs">{permission.slug}</div>
-                {permission.description && (
-                  <div className="text-white/40 text-xs mt-1">{permission.description}</div>
-                )}
+    <>
+      <div className="space-y-3">
+        <div className="bg-gray-900 p-3 rounded-lg border border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                <LayoutDashboard className="w-6 h-6" />
+                Dashboard
+              </h1>
+              <p className="text-white/80 mt-1 flex items-center gap-2">
+                <span className="text-lg">👋</span>
+                Welcome Back, {user?.name || "User"}!
+              </p>
+              <div className="flex items-center gap-4 mt-2 flex-wrap">
+                <span className="text-white/60 text-sm">
+                  Role: {user?.role?.name}
+                </span>
+                <span className="text-white/60 text-sm">•</span>
+                <span className="text-white/60 text-sm">
+                  Permissions: {user?.role?.permissions?.length || 0}
+                </span>
+                <span className="text-white/60 text-sm">•</span>
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    dataSource === "api"
+                      ? "bg-green-500/20 text-green-300"
+                      : "bg-blue-500/20 text-blue-300"
+                  }`}
+                >
+                  {dataSource === "api" ? "🔄 Live Data" : "🍪 Cached"}
+                </span>
               </div>
-            ))}
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="text-white/60 text-sm">Email</div>
+              <div className="text-white text-sm">{user?.email}</div>
+              {user?.email_verified_at && (
+                <div className="text-green-400 text-xs mt-1">✓ Verified</div>
+              )}
+            </div>
           </div>
         </div>
-      )} */}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-lg text-white">
-          <h3 className="text-sm font-medium text-blue-100">Total Sales</h3>
-          <p className="text-2xl font-bold">5,700</p>
+        {/* --- KARTU STATISTIK LIS --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-sky-500/20 rounded-lg">
+                <Building className="w-6 h-6 text-sky-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total Health Facilities</p>
+                <p className="text-2xl font-bold text-white">
+                  {loading ? "..." : stats?.total_facilities ?? 0}
+                </p>
+              </div>
+            </div>
+          </div> */}
+          <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-emerald-500/20 rounded-lg">
+                <FileText className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total Reports</p>
+                <p className="text-2xl font-bold text-white">
+                  {loading ? "..." : stats?.total_reports ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-amber-500/20 rounded-lg">
+                <Clock className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Progress Status</p>
+                <p className="text-2xl font-bold text-white">
+                  {loading ? "..." : stats?.progress_reports ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-500/20 rounded-lg">
+                <Clock className="w-6 h-6 text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Completed Status</p>
+                <p className="text-2xl font-bold text-white">
+                  {loading ? "..." : stats?.completed_reports ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-rose-500/20 rounded-lg">
+                <Wrench className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total Technician</p>
+                <p className="text-2xl font-bold text-white">
+                  {loading ? "..." : stats?.total_engineers ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-lg text-white">
-          <h3 className="text-sm font-medium text-green-100">Revenue</h3>
-          <p className="text-2xl font-bold">$45,231</p>
-        </div>
-        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4 rounded-lg text-white">
-          <h3 className="text-sm font-medium text-yellow-100">Orders</h3>
-          <p className="text-2xl font-bold">1,234</p>
-        </div>
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-lg text-white">
-          <h3 className="text-sm font-medium text-purple-100">Customers</h3>
-          <p className="text-2xl font-bold">567</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Bar Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-lg ">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">
-            Penjualan Bulanan
-          </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
+        {/* --- GRAFIK VOLUME LAPORAN --- */}
+        <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">
+              Monthly Report Volume
+            </h2>
+            <div className="flex items-center gap-2 mt-2 sm:mt-0">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg p-2"
+              >
+                {months.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg p-2"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={reportVolume}>
               <XAxis
-                dataKey="name"
-                stroke="#64748b"
+                dataKey="day"
+                name="Date"
+                stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                stroke="#64748b"
+                stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${value}`}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#1f2937",
-                  border: "none",
+                  border: "1px solid #374151",
                   borderRadius: "8px",
-                  color: "white",
                 }}
+                labelStyle={{ color: "white" }}
               />
               <Bar
-                dataKey="Sales"
-                fill="#6366f1"
+                dataKey="reports"
+                fill="#38bdf8"
                 radius={[4, 4, 0, 0]}
-                name="Penjualan"
+                name="Total Reports"
               />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Line Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">
-            Tren Penjualan
-          </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
-              <XAxis
-                dataKey="name"
-                stroke="#64748b"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#64748b"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "white",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="Sales"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: "#10b981" }}
-                name="Penjualan"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Donut Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-lg col-span-full md:col-span-2">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">
-            Distribusi Layanan
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={donutData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                innerRadius={60}
-                fill="#8884d8"
-                label={({ name, percent }) =>
-                  `${name} ${(percent * 100).toFixed(0)}%`
-                }
-                labelLine={false}
-              >
-                {donutData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                formatter={(value, entry) => (
-                  <span style={{ color: entry.color }}>{value}</span>
-                )}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "white",
-                }}
-                labelStyle={{ color: "white" }}
-                itemStyle={{ color: "white" }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+            {/* --- GRAFIK DISTRIBUSI LAPORAN PER USER --- */}
+            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+                <h2 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Report Distribution Per User
+                </h2>
+                <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                    <Pie
+                        data={pieChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        innerRadius={60}
+                        fill="#8884d8"
+                        label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                        labelLine={false}
+                    >
+                        {pieChartData.map((entry, index) => (
+                        <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                        />
+                        ))}
+                    </Pie>
+                    <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        formatter={(value, entry) => (
+                        <span style={{ color: "white" }}>{value}</span>
+                        )}
+                    />
+                    <Tooltip
+                        contentStyle={{
+                        backgroundColor: "#1f2937",
+                        border: "none",
+                        borderRadius: "8px",
+                        color: "white",
+                        }}
+                        labelStyle={{ color: "white" }}
+                        itemStyle={{ color: "white" }}
+                    />
+                    </PieChart>
+                </ResponsiveContainer>
+                </div>
+
+
+            {/* --- GRAFIK DISTRIBUSI FASILITAS KESEHATAN PER KOTA --- */}
+            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Building2 className="w-5 h-5" />
+                        Health Facility
+                    </h2>
+                    <div className="mt-2 sm:mt-0">
+                        <CustomScrollSelect
+                            placeholder="Select Type"
+                            options={facilityTypeOptions}
+                            value={selectedFacilityType}
+                            onChange={setSelectedFacilityType}
+                        />
+                    </div>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                        <Pie
+                            data={healthFacilityChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={0}
+                            labelLine={false}
+                            label={false}
+                        >
+                            {healthFacilityChartData.map((entry, index) => (
+                            <Cell key={`cell-hf-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                         <Legend
+                            verticalAlign="bottom"
+                            height={36}
+                            formatter={(value) => (
+                              <span className="text-white">{value}</span>
+                            )}
+                        />
+                        <Tooltip
+                            contentStyle={{
+                                backgroundColor: "#1f2937",
+                                border: "none",
+                                borderRadius: "8px",
+                            }}
+                             labelStyle={{ color: "white" }}
+                            itemStyle={{ color: "white" }}
+                        />
+                        <text x='50%' y='40%' textAnchor="middle" dominantBaseline="central" className="fill-white text-3xl font-bold">
+                          {totalHealthFacilities}
+                        </text>
+                        <text x='50%' y='50%' textAnchor="middle" dominantBaseline="central" className="fill-gray-400 text-sm">
+                          Total Fasilitas
+                        </text>
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

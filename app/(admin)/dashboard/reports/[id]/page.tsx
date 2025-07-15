@@ -16,9 +16,15 @@ import {
   Building,
   ClipboardList,
   ImageIcon,
+  Cog,
+  Package,
+  X,
+  AlertTriangle,
+  Printer,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
+import PrintLayout from "@/components/PrintLayout";
 
 // --- Interface Definitions ---
 
@@ -103,6 +109,26 @@ interface ReportWorkItemType {
   type_of_work: TypeOfWork;
 }
 
+interface Parameter {
+  id: number;
+  name: string;
+  uraian: string;
+  description: string;
+}
+
+interface PartImage {
+  id: number;
+  image: string;
+  description: string;
+}
+
+interface PartUsedForRepair {
+  id: number;
+  uraian: string;
+  quantity: string;
+  images: PartImage[];
+}
+
 interface ReportWorkItem {
   id: number;
   report_id: number;
@@ -116,8 +142,8 @@ interface ReportWorkItem {
   note: string;
   job_order: string;
   report_work_item_type: ReportWorkItemType[];
-  parameter: string[];
-  part_used_for_repair: string[];
+  parameter: Parameter[];
+  part_used_for_repair: PartUsedForRepair[];
 }
 
 interface Location {
@@ -152,12 +178,116 @@ interface Report {
   location: Location;
 }
 
+// --- START: Komponen Dialog Gambar ---
+// --- START: Komponen Dialog Gambar ---
+const ImageDialog = ({
+  imageUrl,
+  description,
+  onClose,
+}: {
+  imageUrl: string | null;
+  description: string;
+  onClose: () => void;
+}) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setIsError(false);
+  }, [imageUrl]);
+
+  if (!imageUrl) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 rounded-lg shadow-xl relative max-w-4xl max-h-[90vh] w-full h-full flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header with close button */}
+        <div className="flex justify-between items-center p-4 border-b border-gray-700">
+          <h3 className="text-white font-semibold">Image Preview</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white bg-gray-800 rounded-full p-2 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Image container */}
+        <div className="flex-1 p-4 flex items-center justify-center relative min-h-0">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            </div>
+          )}
+
+          {isError && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-red-400 flex flex-col items-center gap-2">
+                <AlertTriangle className="w-12 h-12" />
+                <span className="text-lg">Gagal memuat gambar</span>
+                <span className="text-sm text-gray-500 text-center">
+                  Pastikan URL gambar valid dan dapat diakses
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Image */}
+          <div className="relative w-full h-full">
+            <Image
+              src={imageUrl}
+              alt={description || "Enlarged image"}
+              fill
+              style={{ objectFit: "contain" }}
+              className={`transition-opacity duration-300 ${
+                isLoading || isError ? "opacity-0" : "opacity-100"
+              }`}
+              onLoad={() => {
+                console.log("Image loaded successfully:", imageUrl);
+                setIsLoading(false);
+              }}
+              onError={(e) => {
+                console.error("Failed to load image:", imageUrl);
+                setIsLoading(false);
+                setIsError(true);
+              }}
+              unoptimized // Add this to bypass Next.js optimization if needed
+            />
+          </div>
+        </div>
+
+        {/* Description footer */}
+        {description && !isError && (
+          <div className="p-4 border-t border-gray-700">
+            <p className="text-center text-gray-300 text-sm">{description}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+// --- END: Komponen Dialog Gambar ---
+// --- END: Komponen Dialog Gambar ---
+
 export default function ReportDetailPage() {
   const params = useParams();
   const { id } = params;
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{
+    url: string;
+    description: string;
+  } | null>(null);
+
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -199,7 +329,6 @@ export default function ReportDetailPage() {
     }
   }, [id]);
 
-  // Group work items by device
   const groupedWorkItems = useMemo(() => {
     if (!report?.report_work_item) return [];
 
@@ -208,7 +337,7 @@ export default function ReportDetailPage() {
     } = {};
 
     report.report_work_item.forEach((workItem) => {
-      const device = report.health_facility.medical_devices.find(
+      const device = report.health_facility?.medical_devices?.find(
         (d) => d.id === workItem.medical_device_id
       );
 
@@ -299,57 +428,112 @@ export default function ReportDetailPage() {
     title: string;
     url: string | null;
   }) => {
-    // Base URL untuk storage dari environment variable
     const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
-    
-    // Konstruksi URL berdasarkan jenis signature dan nama file
     let fullImageUrl = null;
-    
+
     if (url) {
-      // Tentukan folder berdasarkan nama file
-      let folderPath = '';
-      
-      if (url.includes('customer_signature')) {
-        folderPath = 'signatures/customer_signatures';
-      } else if (url.includes('employee_signature')) {
-        folderPath = 'signatures/employee_signatures';
+      let folderPath = "";
+      if (url.includes("customer_signature")) {
+        folderPath = "signatures/customer_signatures";
+      } else if (url.includes("employee_signature")) {
+        folderPath = "signatures/employee_signatures";
       } else {
-        // Default jika tidak ada pattern yang cocok
-        folderPath = 'signatures';
+        folderPath = "signatures";
       }
-      
       fullImageUrl = `${baseStorageUrl}/${folderPath}/${url}`;
     }
-    
-    console.log('Full Image URL:', fullImageUrl);
 
     return (
       <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 text-center flex flex-col">
         <p className="text-sm font-semibold text-white mb-2">{title}</p>
-
-        {/* Container ini dibuat 'relative' agar Image dengan prop 'fill' bisa mengisinya.
-              Kita juga beri 'flex-grow' agar mengambil sisa ruang vertikal.
-            */}
         <div className="relative flex-grow w-full h-24 bg-gray-700 rounded-md">
           {fullImageUrl ? (
             <Image
               src={fullImageUrl}
               alt={`${title} signature`}
               fill
-              style={{ objectFit: "contain" }} // Gunakan style untuk objectFit saat menggunakan 'fill'
-              className="bg-white rounded-md p-1" // Styling untuk background, border-radius, dan padding
+              style={{ objectFit: "contain" }}
+              className="bg-white rounded-md p-1"
               onError={(e) => {
-                // Handle error jika gambar gagal dimuat
-                console.error('Failed to load image:', fullImageUrl);
-                e.currentTarget.style.display = 'none';
+                console.error("Failed to load image:", fullImageUrl);
+                const target = e.currentTarget as HTMLImageElement;
+                target.style.display = "none";
+                const parent = target.parentElement;
+                if (parent) {
+                  const placeholder = parent.querySelector(".placeholder-icon");
+                  if (placeholder)
+                    (placeholder as HTMLElement).style.display = "flex";
+                }
               }}
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon className="w-8 h-8 text-gray-500" />
-            </div>
-          )}
+          ) : null}
+          <div
+            className={`w-full h-full flex items-center justify-center placeholder-icon ${
+              fullImageUrl ? "hidden" : ""
+            }`}
+          >
+            <ImageIcon className="w-8 h-8 text-gray-500" />
+          </div>
         </div>
+      </div>
+    );
+  };
+
+  const PartImageBox = ({
+    image,
+    onImageClick,
+  }: {
+    image: PartImage;
+    onImageClick: (url: string, description: string) => void;
+  }) => {
+    const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
+    const fullImageUrl = image.image
+      ? `${baseStorageUrl}/parts_used_images/${image.image}`
+      : null;
+
+    const handleClick = () => {
+      if (fullImageUrl) {
+        onImageClick(fullImageUrl, image.description || "Part image");
+      }
+    };
+
+    return (
+      <div
+        className="border border-gray-600 rounded-lg p-2 text-center flex flex-col cursor-pointer hover:border-blue-400 transition-colors"
+        onClick={handleClick}
+      >
+        <div className="relative w-full h-32 bg-gray-700 rounded-md mb-2 flex-grow">
+          {fullImageUrl ? (
+            <Image
+              src={fullImageUrl}
+              alt={image.description || "Part image"}
+              fill
+              style={{ objectFit: "contain" }}
+              className="bg-white rounded-md p-1"
+              onError={(e) => {
+                console.error("Failed to load part image:", fullImageUrl);
+                const target = e.currentTarget as HTMLImageElement;
+                target.style.display = "none";
+                const parent = target.parentElement;
+                if (parent) {
+                  const placeholder = parent.querySelector(".placeholder-icon");
+                  if (placeholder)
+                    (placeholder as HTMLElement).style.display = "flex";
+                }
+              }}
+            />
+          ) : null}
+          <div
+            className={`w-full h-full items-center justify-center placeholder-icon ${
+              fullImageUrl ? "hidden" : "flex"
+            }`}
+          >
+            <ImageIcon className="w-8 h-8 text-gray-500" />
+          </div>
+        </div>
+        <p className="text-xs text-gray-300 h-8 overflow-hidden">
+          {image.description || "No description"}
+        </p>
       </div>
     );
   };
@@ -412,204 +596,324 @@ export default function ReportDetailPage() {
   const currentStatus = statusConfig[report.is_status] || statusConfig.Progress;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <FileText className="w-8 h-8 text-blue-400" />
-          Report Details
-        </h1>
-        <Link
-          href="/dashboard/reports"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to List
-        </Link>
-      </div>
+    <>
+      <ImageDialog
+        imageUrl={selectedImage?.url || null}
+        description={selectedImage?.description || ""}
+        onClose={() => setSelectedImage(null)}
+      />
 
-      {/* Status Banner */}
-      <div
-        className={`p-4 rounded-xl flex items-center gap-4 ${currentStatus.className}`}
-      >
-        <currentStatus.Icon className="w-8 h-8" />
-        <div>
-          <h2 className="text-xl font-bold text-white">
-            {currentStatus.title}
-          </h2>
-          <p>
-            {report.is_status === "Completed"
-              ? `Completed on ${formatDate(report.completed_at)}`
-              : `Report created on ${formatDate(report.created_at)}`}
-          </p>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <FileText className="w-8 h-8 text-blue-400" />
+            Report Details
+          </h1>
+          <Link
+            href="/dashboard/reports"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to List
+          </Link>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - General Info */}
-        <div className="lg:col-span-1 space-y-6">
-          <InfoCard
-            icon={<ClipboardCheck className="text-blue-400 w-6 h-6" />}
-            title="General Info"
-          >
-            <InfoRow
-              label="Report Number"
-              value={
-                <code className="text-sm bg-gray-700 px-2 py-1 rounded">
-                  {report.report_number}
-                </code>
-              }
-            />
-            <InfoRow label="Created At" value={formatDate(report.created_at)} />
-            <InfoRow
-              label="Completed At"
-              value={formatDate(report.completed_at)}
-            />
-            <InfoRow
-              label="Total Waktu"
-              value={formatTotalWaktu(report.total_time)}
-            />
-          </InfoCard>
-
-          <InfoCard
-            icon={<UserCheck className="text-blue-400 w-6 h-6" />}
-            title="Technician"
-          >
-            <InfoRow label="Name" value={report.employee.name} />
-            <InfoRow
-              label="Employee ID"
-              value={report.employee.employee_number}
-            />
-            <InfoRow label="Region" value={report.employee.region} />
-            <InfoRow label="Phone" value={report.employee.phone_number} />
-            <InfoRow label="Status" value={report.employee.status} />
-          </InfoCard>
-
-          <InfoCard
-            icon={<Building className="text-blue-400 w-6 h-6" />}
-            title="Health Facility"
-          >
-            <InfoRow label="Name" value={report.health_facility.name} />
-            <InfoRow label="Type" value={report.health_facility.type.name} />
-            <InfoRow label="City" value={report.health_facility.city} />
-            <InfoRow
-              label="Phone"
-              value={report.health_facility.phone_number}
-            />
-            <div className="text-sm pt-2">
-              <p className="text-gray-400 mb-1">Address:</p>
-              <p className="text-white">{report.health_facility.address}</p>
+        {/* Status Banner */}
+        <div
+          className={`p-4 rounded-xl flex items-center justify-between gap-4 ${currentStatus.className}`}
+        >
+          {/* Konten Kiri: Ikon & Status */}
+          <div className="flex items-center gap-4">
+            <currentStatus.Icon className="w-8 h-8 text-white" />
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {currentStatus.title}
+              </h2>
+              <p className="text-white/80">
+                {report.is_status === "Completed"
+                  ? `Completed on ${formatDate(report.completed_at)}`
+                  : `Report created on ${formatDate(report.created_at)}`}
+              </p>
             </div>
-          </InfoCard>
+          </div>
 
-          {report.location && (
+          {/* Tombol Print di Kanan */}
+          <button
+            onClick={() => setIsPrinting(true)}
+            className="inline-flex items-center px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex-shrink-0 cursor-pointer"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - General Info */}
+          <div className="lg:col-span-1 space-y-6">
             <InfoCard
-              icon={<MapPin className="text-blue-400 w-6 h-6" />}
-              title="Location"
+              icon={<ClipboardCheck className="text-blue-400 w-6 h-6" />}
+              title="General Info"
             >
-              <div className="text-sm">
+              <InfoRow
+                label="Report Number"
+                value={
+                  <code className="text-sm bg-gray-700 px-2 py-1 rounded">
+                    {report.report_number}
+                  </code>
+                }
+              />
+              <InfoRow
+                label="Created At"
+                value={formatDate(report.created_at)}
+              />
+              <InfoRow
+                label="Completed At"
+                value={formatDate(report.completed_at)}
+              />
+              <InfoRow
+                label="Total Waktu"
+                value={formatTotalWaktu(report.total_time)}
+              />
+            </InfoCard>
+
+            <InfoCard
+              icon={<UserCheck className="text-blue-400 w-6 h-6" />}
+              title="Technician"
+            >
+              <InfoRow label="Name" value={report.employee?.name ?? "N/A"} />
+              <InfoRow
+                label="Employee ID"
+                value={report.employee?.employee_number ?? "N/A"}
+              />
+              <InfoRow
+                label="Region"
+                value={report.employee?.region ?? "N/A"}
+              />
+              <InfoRow
+                label="Phone"
+                value={report.employee?.phone_number ?? "N/A"}
+              />
+              <InfoRow
+                label="Status"
+                value={report.employee?.status ?? "N/A"}
+              />
+            </InfoCard>
+
+            <InfoCard
+              icon={<Building className="text-blue-400 w-6 h-6" />}
+              title="Health Facility"
+            >
+              <InfoRow
+                label="Name"
+                value={report.health_facility?.name ?? "N/A"}
+              />
+              <InfoRow
+                label="Type"
+                value={report.health_facility?.type?.name ?? "N/A"}
+              />
+              <InfoRow
+                label="City"
+                value={report.health_facility?.city ?? "N/A"}
+              />
+              <InfoRow
+                label="Phone"
+                value={report.health_facility?.phone_number ?? "N/A"}
+              />
+              <div className="text-sm pt-2">
                 <p className="text-gray-400 mb-1">Address:</p>
-                <p className="text-white">{report.location.address}</p>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${report.location.latitude},${report.location.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline mt-2 inline-block"
-                >
-                  View on Google Maps
-                </a>
+                <p className="text-white">
+                  {report.health_facility?.address ?? "N/A"}
+                </p>
               </div>
             </InfoCard>
-          )}
-        </div>
 
-        {/* Right Column - Job and Completion Details */}
-        <div className="lg:col-span-2 space-y-6">
-          <InfoCard
-            icon={<Wrench className="text-blue-400 w-6 h-6" />}
-            title="Work Items"
-          >
-            {groupedWorkItems.length > 0 ? (
-              <div className="space-y-6">
-                {groupedWorkItems.map(({ device, workItems }) => (
-                  <div
-                    key={device.id}
-                    className="bg-gray-800 p-4 rounded-lg border border-gray-700"
+            {report.location && (
+              <InfoCard
+                icon={<MapPin className="text-blue-400 w-6 h-6" />}
+                title="Location"
+              >
+                <div className="text-sm">
+                  <p className="text-gray-400 mb-1">Address:</p>
+                  <p className="text-white">{report.location.address}</p>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${report.location.latitude},${report.location.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline mt-2 inline-block"
                   >
-                    <div className="mb-4">
-                      <p className="font-bold text-white text-lg">
-                        {device.brand} {device.model}
-                      </p>
-                      <div className="text-sm text-gray-400 mt-2 space-y-1">
-                        <p>
-                          Serial:{" "}
-                          <span className="font-mono text-gray-300">
-                            {device.serial_number}
-                          </span>
-                        </p>
-                        <p>
-                          Software Ver:{" "}
-                          <span className="font-mono text-gray-300">
-                            {device.software_version || "N/A"}
-                          </span>
-                        </p>
-                        <p>
-                          Status:{" "}
-                          <span className="text-green-400">
-                            {device.status}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
+                    View on Google Maps
+                  </a>
+                </div>
+              </InfoCard>
+            )}
+          </div>
 
-                    {workItems.map((workItem, index) => (
-                      <div
-                        key={workItem.id}
-                        className="mt-4 pt-4 border-t border-gray-600"
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-semibold text-white">
-                            Work Item #{index + 1}
-                          </h4>
-                          <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded">
-                            {workItem.job_order}
-                          </span>
+          {/* Right Column - Job and Completion Details */}
+          <div className="lg:col-span-2 space-y-6">
+            <InfoCard
+              icon={<Wrench className="text-blue-400 w-6 h-6" />}
+              title="Work Items"
+            >
+              {groupedWorkItems.length > 0 ? (
+                <div className="space-y-6">
+                  {groupedWorkItems.map(({ device, workItems }) => (
+                    <div
+                      key={device.id}
+                      className="bg-gray-800 p-4 rounded-lg border border-gray-700"
+                    >
+                      <div className="mb-4">
+                        <p className="font-bold text-white text-lg">
+                          {device.brand} {device.model}
+                        </p>
+                        <div className="text-sm text-gray-400 mt-2 space-y-1">
+                          <p>
+                            Serial:{" "}
+                            <span className="font-mono text-gray-300">
+                              {device.serial_number}
+                            </span>
+                          </p>
+                          <p>
+                            Software Ver:{" "}
+                            <span className="font-mono text-gray-300">
+                              {device.software_version || "N/A"}
+                            </span>
+                          </p>
+                          <p>
+                            Status:{" "}
+                            <span className="text-green-400">
+                              {device.status}
+                            </span>
+                          </p>
                         </div>
+                      </div>
 
-                        <div className="space-y-3 text-sm">
-                          <div>
-                            <p className="text-gray-400">Problem:</p>
-                            <p className="text-white bg-gray-700 p-2 rounded">
-                              {workItem.problem}
-                            </p>
+                      {workItems.map((workItem, index) => (
+                        <div
+                          key={workItem.id}
+                          className="mt-4 pt-4 border-t border-gray-600 space-y-4"
+                        >
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-semibold text-white">
+                              Work Item #{index + 1}
+                            </h4>
+                            <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded">
+                              {workItem.job_order}
+                            </span>
                           </div>
 
-                          <div>
-                            <p className="text-gray-400">Error Code:</p>
-                            <p className="text-white font-mono bg-gray-700 p-2 rounded">
-                              {workItem.error_code}
-                            </p>
+                          <div className="space-y-3 text-sm">
+                            <div>
+                              <p className="text-gray-400 mb-1">Problem:</p>
+                              <p className="text-white bg-gray-700 p-2 rounded">
+                                {workItem.problem}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-gray-400 mb-1">Error Code:</p>
+                              <p className="text-white font-mono bg-gray-700 p-2 rounded">
+                                {workItem.error_code}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-gray-400 mb-1">
+                                Action Taken:
+                              </p>
+                              <p className="text-white bg-gray-700 p-2 rounded">
+                                {workItem.job_action}
+                              </p>
+                            </div>
                           </div>
 
-                          <div>
-                            <p className="text-gray-400">Action Taken:</p>
-                            <p className="text-white bg-gray-700 p-2 rounded">
-                              {workItem.job_action}
-                            </p>
-                          </div>
+                          {workItem.parameter?.length > 0 && (
+                            <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Cog className="w-5 h-5 text-gray-300" />
+                                <h5 className="font-semibold text-white">
+                                  Parameters Checked
+                                </h5>
+                              </div>
+                              <div className="space-y-2">
+                                {workItem.parameter.map((param) => (
+                                  <div
+                                    key={param.id}
+                                    className="bg-gray-800/60 p-3 rounded-md"
+                                  >
+                                    <p className="text-white font-semibold">
+                                      {param.name}
+                                    </p>
+                                    <p className="text-gray-300 text-xs mt-1">
+                                      Uraian: {param.uraian}
+                                    </p>
+                                    <p className="text-gray-300 text-xs">
+                                      Description: {param.description}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {workItem.part_used_for_repair?.length > 0 && (
+                            <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Package className="w-5 h-5 text-gray-300" />
+                                <h5 className="font-semibold text-white">
+                                  Parts Used for Repair
+                                </h5>
+                              </div>
+                              <div className="space-y-3">
+                                {workItem.part_used_for_repair.map((part) => (
+                                  <div
+                                    key={part.id}
+                                    className="bg-gray-800/60 p-3 rounded-md"
+                                  >
+                                    <p className="text-white">
+                                      {part.uraian} (Quantity: {part.quantity})
+                                    </p>
+                                    {part.images?.length > 0 && (
+                                      <div className="mt-3">
+                                        <p className="text-gray-400 text-xs font-semibold mb-2">
+                                          Images:
+                                        </p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                          {part.images.map((img) => (
+                                            <PartImageBox
+                                              key={img.id}
+                                              image={img}
+                                              onImageClick={(url, desc) =>
+                                                setSelectedImage({
+                                                  url: url,
+                                                  description: desc,
+                                                })
+                                              }
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           {workItem.note && (
                             <div>
-                              <p className="text-gray-400">Notes:</p>
+                              <p className="text-gray-400 mb-1">Notes:</p>
                               <p className="text-white bg-gray-700 p-2 rounded">
                                 {workItem.note}
                               </p>
                             </div>
                           )}
 
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center pt-2">
                             <div>
-                              <p className="text-gray-400">Work Types:</p>
+                              <p className="text-gray-400 text-sm">
+                                Work Types:
+                              </p>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {workItem.report_work_item_type.map(
                                   (workType) => (
@@ -624,67 +928,76 @@ export default function ReportDetailPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-gray-400">Time Spent:</p>
+                              <p className="text-gray-400 text-sm">
+                                Time Spent:
+                              </p>
                               <p className="text-white font-semibold">
                                 {formatTotalWaktu(workItem.total_time)}
                               </p>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p>No work items found for this report.</p>
-            )}
-          </InfoCard>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No work items found for this report.</p>
+              )}
+            </InfoCard>
 
-          <InfoCard
-            icon={<ClipboardList className="text-blue-400 w-6 h-6" />}
-            title="Completion Details"
-          >
-            <InfoRow
-              label="Customer Name"
-              value={report.customer_name || "-"}
-            />
-            <InfoRow
-              label="Customer Phone"
-              value={report.customer_phone || "-"}
-            />
-
-            {report.note && (
-              <div className="pt-2">
-                <h4 className="font-semibold text-white mb-1">Notes</h4>
-                <p className="text-gray-300 p-3 bg-gray-800 rounded-lg">
-                  {report.note}
-                </p>
-              </div>
-            )}
-
-            {report.suggestion && (
-              <div className="pt-2">
-                <h4 className="font-semibold text-white mb-1">Suggestion</h4>
-                <p className="text-gray-300 p-3 bg-gray-800 rounded-lg">
-                  {report.suggestion}
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <SignatureBox
-                title="Technician Signature"
-                url={report.attendance_employee}
+            <InfoCard
+              icon={<ClipboardList className="text-blue-400 w-6 h-6" />}
+              title="Completion Details"
+            >
+              <InfoRow
+                label="Customer Name"
+                value={report.customer_name || "-"}
               />
-              <SignatureBox
-                title="Customer Signature"
-                url={report.attendance_customer}
+              <InfoRow
+                label="Customer Phone"
+                value={report.customer_phone || "-"}
               />
-            </div>
-          </InfoCard>
+
+              {report.note && (
+                <div className="pt-2">
+                  <h4 className="font-semibold text-white mb-1">Notes</h4>
+                  <p className="text-gray-300 p-3 bg-gray-800 rounded-lg">
+                    {report.note}
+                  </p>
+                </div>
+              )}
+
+              {report.suggestion && (
+                <div className="pt-2">
+                  <h4 className="font-semibold text-white mb-1">Suggestion</h4>
+                  <p className="text-gray-300 p-3 bg-gray-800 rounded-lg">
+                    {report.suggestion}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <SignatureBox
+                  title="Technician Signature"
+                  url={report.attendance_employee}
+                />
+                <SignatureBox
+                  title="Customer Signature"
+                  url={report.attendance_customer}
+                />
+              </div>
+            </InfoCard>
+          </div>
         </div>
       </div>
-    </div>
+      {/* Render komponen PrintLayout sebagai overlay jika isPrinting true */}
+      {isPrinting && report && (
+        <PrintLayout
+          report={report as any}
+          onClose={() => setIsPrinting(false)}
+        />
+      )}
+    </>
   );
 }

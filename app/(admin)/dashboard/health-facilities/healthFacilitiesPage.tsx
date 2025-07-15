@@ -11,9 +11,11 @@ import {
   Search,
   X,
   Eye,
+  FileDown,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
+import * as XLSX from "xlsx";
 
 // --- Interface Definitions ---
 interface TypeOfHealthFacility {
@@ -25,7 +27,16 @@ interface TypeOfHealthFacility {
   updated_at: string;
 }
 
+interface MedicalDevice {
+  brand: string;
+  model: string;
+  serial_number: string;
+  software_version?: string;
+  status: string;
+}
+
 interface HealthFacility {
+  medical_devices: MedicalDevice[] | boolean;
   id: number;
   type_of_health_facility_id: number;
   name: string;
@@ -40,8 +51,12 @@ interface HealthFacility {
 }
 
 export default function HealthFacilitiesClientPage() {
-  const [healthFacilities, setHealthFacilities] = useState<HealthFacility[]>([]);
-  const [healthFacilityTypes, setHealthFacilityTypes] = useState<TypeOfHealthFacility[]>([]);
+  const [healthFacilities, setHealthFacilities] = useState<HealthFacility[]>(
+    []
+  );
+  const [healthFacilityTypes, setHealthFacilityTypes] = useState<
+    TypeOfHealthFacility[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,10 +69,454 @@ export default function HealthFacilitiesClientPage() {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string>("");
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const [selectedTypeFilters, setSelectedTypeFilters] = useState<{ label: string; value: number }[]>([]);
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<
+    { label: string; value: number }[]
+  >([]);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // const handleExport = async () => {
+  //   setIsExporting(true);
+  //   const token = Cookies.get("token");
+
+  //   if (!token) {
+  //     Swal.fire({
+  //       title: "Gagal",
+  //       text: "Token otentikasi tidak ditemukan. Silakan login kembali.",
+  //       icon: "error",
+  //       background: "#1e293b",
+  //       color: "#f8fafc",
+  //     });
+  //     setIsExporting(false);
+  //     return;
+  //   }
+
+  //   // Menampilkan notifikasi loading
+  //   Swal.fire({
+  //     title: "Mengekspor Data",
+  //     text: "Mohon tunggu, kami sedang menyiapkan file Anda...",
+  //     allowOutsideClick: false,
+  //     background: "#1e293b",
+  //     color: "#f8fafc",
+  //     didOpen: () => {
+  //       Swal.showLoading();
+  //     },
+  //   });
+
+  //   try {
+  //     // Langkah 1: Ambil SEMUA data fasilitas sesuai filter aktif
+  //     const typeIds = selectedTypeFilters.map((f) => f.value);
+  //     const params = new URLSearchParams();
+  //     params.append("per_page", "1000"); // Gunakan angka besar alih-alih "All"
+
+  //     // Tambahkan parameter search jika ada
+  //     if (searchTerm.trim()) {
+  //       params.append("search", searchTerm.trim());
+  //     }
+
+  //     // Tambahkan filter type jika ada
+  //     if (typeIds.length > 0) {
+  //       typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
+  //     }
+
+  //     console.log("Fetching export data with params:", params.toString());
+
+  //     const listRes = await fetch(
+  //       `http://report-api.test/api/health-facility?${params.toString()}`,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //           Accept: "application/json",
+  //           "Content-Type": "application/json",
+  //         },
+  //       }
+  //     );
+
+  //     console.log("List response status:", listRes.status);
+
+  //     if (!listRes.ok) {
+  //       const errorText = await listRes.text();
+  //       console.error("List API error:", errorText);
+  //       throw new Error(
+  //         `Gagal mengambil daftar fasilitas kesehatan untuk diekspor. Status: ${listRes.status}`
+  //       );
+  //     }
+
+  //     const listJson = await listRes.json();
+  //     console.log("List response data:", listJson);
+
+  //     // Periksa struktur response
+  //     let facilitiesToFetch: HealthFacility[] = [];
+  //     if (listJson.data && Array.isArray(listJson.data)) {
+  //       facilitiesToFetch = listJson.data;
+  //     } else if (Array.isArray(listJson)) {
+  //       facilitiesToFetch = listJson;
+  //     } else {
+  //       console.error("Unexpected response structure:", listJson);
+  //       throw new Error("Format response tidak sesuai yang diharapkan.");
+  //     }
+
+  //     if (facilitiesToFetch.length === 0) {
+  //       throw new Error(
+  //         "Tidak ada data yang tersedia untuk diekspor berdasarkan filter yang dipilih."
+  //       );
+  //     }
+
+  //     console.log(`Found ${facilitiesToFetch.length} facilities to export`);
+
+  //     // Langkah 2: Ambil data detail untuk setiap fasilitas untuk mendapatkan medical_devices
+  //     const detailPromises = facilitiesToFetch.map(async (facility) => {
+  //       try {
+  //         const detailRes = await fetch(
+  //           `http://report-api.test/api/health-facility/${facility.slug}`,
+  //           {
+  //             headers: {
+  //               Authorization: `Bearer ${token}`,
+  //               Accept: "application/json",
+  //               "Content-Type": "application/json",
+  //             },
+  //           }
+  //         );
+
+  //         if (detailRes.ok) {
+  //           const detailJson = await detailRes.json();
+  //           return detailJson.data || detailJson;
+  //         } else {
+  //           console.error(`Failed to fetch detail for ${facility.slug}:`, detailRes.status);
+  //           // Return original facility if detail fetch fails
+  //           return facility;
+  //         }
+  //       } catch (error) {
+  //         console.error(`Error fetching detail for ${facility.slug}:`, error);
+  //         // Return original facility if detail fetch fails
+  //         return facility;
+  //       }
+  //     });
+
+  //     const detailResults = await Promise.all(detailPromises);
+  //     const facilitiesWithDetails: HealthFacility[] = detailResults.filter(
+  //       (facility) => facility !== null
+  //     );
+
+  //     console.log(`Got details for ${facilitiesWithDetails.length} facilities`);
+
+  //     // Langkah 3: Ratakan data (Flatten) untuk format Excel
+  //     const excelData: any[] = [];
+  //     facilitiesWithDetails.forEach((facility) => {
+  //       // Periksa apakah medical_devices ada dan berupa array
+  //       if (
+  //         facility.medical_devices &&
+  //         Array.isArray(facility.medical_devices) &&
+  //         facility.medical_devices.length > 0
+  //       ) {
+  //         // Jika ada medical devices, buat baris untuk setiap device
+  //         facility.medical_devices.forEach((device) => {
+  //           excelData.push({
+  //             "Nama Fasilitas": facility.name || "-",
+  //             "Tipe Fasilitas": facility.type?.name || "-",
+  //             Email: facility.email || "-",
+  //             "Nomor Telepon": facility.phone_number || "-",
+  //             Kota: facility.city || "-",
+  //             Alamat: facility.address || "-",
+  //             "Merek Perangkat": device.brand || "-",
+  //             "Model Perangkat": device.model || "-",
+  //             "Nomor Seri": device.serial_number || "-",
+  //             "Versi Software": device.software_version || "-",
+  //             "Status Perangkat": device.status || "-",
+  //           });
+  //         });
+  //       } else {
+  //         // Jika tidak ada medical devices, tetap tampilkan data fasilitas
+  //         excelData.push({
+  //           "Nama Fasilitas": facility.name || "-",
+  //           "Tipe Fasilitas": facility.type?.name || "-",
+  //           Email: facility.email || "-",
+  //           "Nomor Telepon": facility.phone_number || "-",
+  //           Kota: facility.city || "-",
+  //           Alamat: facility.address || "-",
+  //           "Merek Perangkat": "-",
+  //           "Model Perangkat": "-",
+  //           "Nomor Seri": "-",
+  //           "Versi Software": "-",
+  //           "Status Perangkat": "-",
+  //         });
+  //       }
+  //     });
+
+  //     if (excelData.length === 0) {
+  //       throw new Error("Tidak ada data yang dapat diekspor.");
+  //     }
+
+  //     console.log(`Prepared ${excelData.length} rows for Excel export`);
+
+  //     // Langkah 4: Buat dan unduh file Excel menggunakan library xlsx
+  //     const worksheet = XLSX.utils.json_to_sheet(excelData);
+  //     const workbook = XLSX.utils.book_new();
+  //     XLSX.utils.book_append_sheet(workbook, worksheet, "Fasilitas Kesehatan");
+
+  //     // Menyesuaikan lebar kolom secara otomatis
+  //     const columnWidths = Object.keys(excelData[0] || {}).map((key) => ({
+  //       wch: Math.max(key.length, 20), // Lebar minimal 20 karakter atau sepanjang judul
+  //     }));
+  //     worksheet["!cols"] = columnWidths;
+
+  //     // Generate filename with timestamp
+  //     const now = new Date();
+  //     const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
+  //     const filename = `Laporan_Fasilitas_Kesehatan_${timestamp}.xlsx`;
+
+  //     XLSX.writeFile(workbook, filename);
+
+  //     // Menampilkan notifikasi sukses
+  //     Swal.fire({
+  //       title: "Ekspor Berhasil!",
+  //       text: `Data untuk ${facilitiesWithDetails.length} fasilitas kesehatan dengan ${excelData.length} baris telah berhasil diekspor.`,
+  //       icon: "success",
+  //       background: "#1e293b",
+  //       color: "#f8fafc",
+  //     });
+  //   } catch (err) {
+  //     const errorMessage =
+  //       err instanceof Error
+  //         ? err.message
+  //         : "Terjadi kesalahan yang tidak terduga saat ekspor.";
+  //     console.error("Proses ekspor gagal:", err);
+  //     // Menampilkan notifikasi error
+  //     Swal.fire({
+  //       title: "Ekspor Gagal",
+  //       text: errorMessage,
+  //       icon: "error",
+  //       background: "#1e293b",
+  //       color: "#f8fafc",
+  //     });
+  //   } finally {
+  //     setIsExporting(false); // Menghentikan loading state
+  //   }
+  // };
+
+  const handleExport = async () => {
+  setIsExporting(true);
+  const token = Cookies.get("token");
+
+  if (!token) {
+    Swal.fire({
+      title: "Gagal",
+      text: "Token otentikasi tidak ditemukan. Silakan login kembali.",
+      icon: "error",
+      background: "#1e293b",
+      color: "#f8fafc",
+    });
+    setIsExporting(false);
+    return;
+  }
+
+  // Menampilkan notifikasi loading
+  Swal.fire({
+    title: "Mengekspor Data",
+    text: "Mohon tunggu, kami sedang menyiapkan file Anda...",
+    allowOutsideClick: false,
+    background: "#1e293b",
+    color: "#f8fafc",
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+
+  try {
+    // Langkah 1: Ambil SEMUA data fasilitas sesuai filter aktif
+    const typeIds = selectedTypeFilters.map((f) => f.value);
+    const params = new URLSearchParams();
+    params.append("per_page", "1000"); // Gunakan angka besar alih-alih "All"
+
+    // Tambahkan parameter search jika ada
+    if (searchTerm.trim()) {
+      params.append("search", searchTerm.trim());
+    }
+
+    // Tambahkan filter type jika ada
+    if (typeIds.length > 0) {
+      typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
+    }
+
+    console.log("Fetching export data with params:", params.toString());
+
+    const listRes = await fetch(
+      `http://report-api.test/api/health-facility?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("List response status:", listRes.status);
+
+    if (!listRes.ok) {
+      const errorText = await listRes.text();
+      console.error("List API error:", errorText);
+      throw new Error(
+        `Gagal mengambil daftar fasilitas kesehatan untuk diekspor. Status: ${listRes.status}`
+      );
+    }
+
+    const listJson = await listRes.json();
+    console.log("List response data:", listJson);
+
+    // Periksa struktur response
+    let facilitiesToFetch: HealthFacility[] = [];
+    if (listJson.data && Array.isArray(listJson.data)) {
+      facilitiesToFetch = listJson.data;
+    } else if (Array.isArray(listJson)) {
+      facilitiesToFetch = listJson;
+    } else {
+      console.error("Unexpected response structure:", listJson);
+      throw new Error("Format response tidak sesuai yang diharapkan.");
+    }
+
+    if (facilitiesToFetch.length === 0) {
+      throw new Error(
+        "Tidak ada data yang tersedia untuk diekspor berdasarkan filter yang dipilih."
+      );
+    }
+
+    console.log(`Found ${facilitiesToFetch.length} facilities to export`);
+
+    // Langkah 2: Ambil data detail untuk setiap fasilitas untuk mendapatkan medical_devices
+    const detailPromises = facilitiesToFetch.map(async (facility) => {
+      try {
+        const detailRes = await fetch(
+          `http://report-api.test/api/health-facility/${facility.slug}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (detailRes.ok) {
+          const detailJson = await detailRes.json();
+          return detailJson.data || detailJson;
+        } else {
+          console.error(`Failed to fetch detail for ${facility.slug}:`, detailRes.status);
+          // Return original facility if detail fetch fails
+          return facility;
+        }
+      } catch (error) {
+        console.error(`Error fetching detail for ${facility.slug}:`, error);
+        // Return original facility if detail fetch fails
+        return facility;
+      }
+    });
+
+    const detailResults = await Promise.all(detailPromises);
+    const facilitiesWithDetails: HealthFacility[] = detailResults.filter(
+      (facility) => facility !== null
+    );
+
+    console.log(`Got details for ${facilitiesWithDetails.length} facilities`);
+
+    // Langkah 3: Ratakan data (Flatten) untuk format Excel - DIPERBAIKI
+    const excelData: any[] = [];
+    facilitiesWithDetails.forEach((facility) => {
+      // Periksa apakah medical_devices ada dan berupa array
+      if (
+        facility.medical_devices &&
+        Array.isArray(facility.medical_devices) &&
+        facility.medical_devices.length > 0
+      ) {
+        // Jika ada medical devices, buat baris untuk setiap device
+        facility.medical_devices.forEach((device, index) => {
+          excelData.push({
+            "Tipe Fasilitas": index === 0 ? (facility.type?.name || "-") : "", // Hanya tampilkan di baris pertama
+            "Nama Fasilitas": index === 0 ? (facility.name || "-") : "", // Hanya tampilkan di baris pertama
+            "Email": index === 0 ? (facility.email || "-") : "", // Hanya tampilkan di baris pertama
+            "Nomor Telepon": index === 0 ? (facility.phone_number || "-") : "", // Hanya tampilkan di baris pertama
+            "Kota": index === 0 ? (facility.city || "-") : "", // Hanya tampilkan di baris pertama
+            "Alamat": index === 0 ? (facility.address || "-") : "", // Hanya tampilkan di baris pertama
+            "Merek Perangkat": device.brand || "-",
+            "Model Perangkat": device.model || "-",
+            "Nomor Seri": device.serial_number || "-",
+            "Versi Software": device.software_version || "-",
+            "Status Perangkat": device.status || "-",
+          });
+        });
+      } else {
+        // Jika tidak ada medical devices, tetap tampilkan data fasilitas
+        excelData.push({
+          "Tipe Fasilitas": facility.type?.name || "-",
+          "Nama Fasilitas": facility.name || "-",
+          "Email": facility.email || "-",
+          "Nomor Telepon": facility.phone_number || "-",
+          "Kota": facility.city || "-",
+          "Alamat": facility.address || "-",
+          "Merek Perangkat": "-",
+          "Model Perangkat": "-",
+          "Nomor Seri": "-",
+          "Versi Software": "-",
+          "Status Perangkat": "-",
+        });
+      }
+    });
+
+    if (excelData.length === 0) {
+      throw new Error("Tidak ada data yang dapat diekspor.");
+    }
+
+    console.log(`Prepared ${excelData.length} rows for Excel export`);
+
+    // Langkah 4: Buat dan unduh file Excel menggunakan library xlsx
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Fasilitas Kesehatan");
+
+    // Menyesuaikan lebar kolom secara otomatis
+    const columnWidths = Object.keys(excelData[0] || {}).map((key) => ({
+      wch: Math.max(key.length, 20), // Lebar minimal 20 karakter atau sepanjang judul
+    }));
+    worksheet["!cols"] = columnWidths;
+
+    // Tambahkan styling untuk merge cells (opsional - memerlukan library tambahan)
+    // Untuk saat ini, data sudah diformat dengan benar untuk Excel
+
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
+    const filename = `Laporan_Fasilitas_Kesehatan_${timestamp}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
+
+    // Menampilkan notifikasi sukses
+    Swal.fire({
+      title: "Ekspor Berhasil!",
+      text: `Data untuk ${facilitiesWithDetails.length} fasilitas kesehatan dengan ${excelData.length} baris telah berhasil diekspor.`,
+      icon: "success",
+      background: "#1e293b",
+      color: "#f8fafc",
+    });
+  } catch (err) {
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : "Terjadi kesalahan yang tidak terduga saat ekspor.";
+    console.error("Proses ekspor gagal:", err);
+    // Menampilkan notifikasi error
+    Swal.fire({
+      title: "Ekspor Gagal",
+      text: errorMessage,
+      icon: "error",
+      background: "#1e293b",
+      color: "#f8fafc",
+    });
+  } finally {
+    setIsExporting(false); // Menghentikan loading state
+  }
+};
 
   // Menggunakan logika permission yang benar (dengan super-admin check)
   const hasPermission = (slug: string) => {
@@ -71,12 +530,15 @@ export default function HealthFacilitiesClientPage() {
     try {
       const token = Cookies.get("token");
       if (!token) throw new Error("Unauthorized");
-      const res = await fetch(`http://report-api.test/api/type-of-health-facility?per_page=All`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
+      const res = await fetch(
+        `http://report-api.test/api/type-of-health-facility?per_page=All`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
       if (!res.ok) throw new Error("Failed to fetch health facility types");
       const json = await res.json();
       setHealthFacilityTypes(Array.isArray(json.data) ? json.data : []);
@@ -101,12 +563,15 @@ export default function HealthFacilitiesClientPage() {
           typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
         }
 
-        const res = await fetch(`http://report-api.test/api/health-facility?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+        const res = await fetch(
+          `http://report-api.test/api/health-facility?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (!res.ok) throw new Error("Failed to fetch health facilities");
         const json = await res.json();
@@ -117,7 +582,11 @@ export default function HealthFacilitiesClientPage() {
         setTotalHealthFacility(json.meta.total);
         setPerPage(json.meta.per_page);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Error fetching health facilities");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error fetching health facilities"
+        );
         setHealthFacilities([]);
       } finally {
         setLoading(false);
@@ -128,71 +597,78 @@ export default function HealthFacilitiesClientPage() {
 
   const handleDelete = async (id: number) => {
     const result = await Swal.fire({
-        title: "Are you sure?",
-        text: "You will not be able to recover this health facility!",
-        icon: "warning",
-        showCancelButton: true,
-        background: "#1e293b",
-        color: "#f8fafc",
-        confirmButtonText: "Yes, delete it!",
-        confirmButtonColor: "#dc2626"
+      title: "Are you sure?",
+      text: "You will not be able to recover this health facility!",
+      icon: "warning",
+      showCancelButton: true,
+      background: "#1e293b",
+      color: "#f8fafc",
+      confirmButtonText: "Yes, delete it!",
+      confirmButtonColor: "#dc2626",
     });
 
     if (result.isConfirmed) {
-        try {
-            const token = Cookies.get("token");
-            if (!token) throw new Error("Token not found");
+      try {
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Token not found");
 
-            const res = await fetch(`http://report-api.test/api/health-facility/${id}`, {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            });
+        const res = await fetch(
+          `http://report-api.test/api/health-facility/${id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
-            if (res.ok) {
-                Swal.fire({
-                    title: "Deleted!",
-                    text: "Health facility has been deleted.",
-                    icon: "success",
-                    background: "#1e293b",
-                    color: "#f8fafc",
-                    timer: 2000,
-                    showConfirmButton: false,
-                    timerProgressBar: true,
-                });
-                // Re-fetch data for the current page
-                const typeIds = selectedTypeFilters.map((item) => item.value);
-                fetchHealthFacilities(currentPage, searchTerm, typeIds);
-            } else {
-                const errorData = await res.json();
-                Swal.fire({
-                    title: "Error",
-                    text: errorData.message || "Failed to delete health facility",
-                    icon: "error",
-                    background: "#1e293b",
-                    color: "#f8fafc",
-                });
-            }
-        } catch (error) {
-            console.error("Error deleting health facility:", error);
-            Swal.fire({
-              title: "Error",
-              text: "An unexpected error occurred.",
-              icon: "error",
-              background: "#1e293b",
-              color: "#f8fafc",
-            });
+        if (res.ok) {
+          Swal.fire({
+            title: "Deleted!",
+            text: "Health facility has been deleted.",
+            icon: "success",
+            background: "#1e293b",
+            color: "#f8fafc",
+            timer: 2000,
+            showConfirmButton: false,
+            timerProgressBar: true,
+          });
+          // Re-fetch data for the current page
+          const typeIds = selectedTypeFilters.map((item) => item.value);
+          fetchHealthFacilities(currentPage, searchTerm, typeIds);
+        } else {
+          const errorData = await res.json();
+          Swal.fire({
+            title: "Error",
+            text: errorData.message || "Failed to delete health facility",
+            icon: "error",
+            background: "#1e293b",
+            color: "#f8fafc",
+          });
         }
+      } catch (error) {
+        console.error("Error deleting health facility:", error);
+        Swal.fire({
+          title: "Error",
+          text: "An unexpected error occurred.",
+          icon: "error",
+          background: "#1e293b",
+          color: "#f8fafc",
+        });
+      }
     }
   };
-  
+
   const handleMultiDelete = async () => {
     if (selectedItems.size === 0) return;
 
-    const selectedHealthFacilities = healthFacilities.filter((cat) => selectedItems.has(cat.id));
-    const healthFacilityNames = selectedHealthFacilities.map((cat) => cat.name).join(", ");
+    const selectedHealthFacilities = healthFacilities.filter((cat) =>
+      selectedItems.has(cat.id)
+    );
+    const healthFacilityNames = selectedHealthFacilities
+      .map((cat) => cat.name)
+      .join(", ");
 
     const result = await Swal.fire({
       title: "Delete Multiple Health Facilities?",
@@ -211,60 +687,69 @@ export default function HealthFacilitiesClientPage() {
     });
 
     if (result.isConfirmed) {
-        setIsDeleting(true);
-        try {
-            const token = Cookies.get("token");
-            if (!token) throw new Error("Token not found");
+      setIsDeleting(true);
+      try {
+        const token = Cookies.get("token");
+        if (!token) throw new Error("Token not found");
 
-            const deletePromises = Array.from(selectedItems).map((id) =>
-                fetch(`http://report-api.test/api/health-facility/${id}`, {
-                    method: "DELETE",
-                    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-                })
-            );
+        const deletePromises = Array.from(selectedItems).map((id) =>
+          fetch(`http://report-api.test/api/health-facility/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          })
+        );
 
-            const results = await Promise.allSettled(deletePromises);
-            const successCount = results.filter(res => res.status === 'fulfilled' && res.value.ok).length;
-            const failedCount = selectedItems.size - successCount;
+        const results = await Promise.allSettled(deletePromises);
+        const successCount = results.filter(
+          (res) => res.status === "fulfilled" && res.value.ok
+        ).length;
+        const failedCount = selectedItems.size - successCount;
 
-            if (failedCount === 0) {
-              Swal.fire({
-                title:"Success!", 
-                text: `Successfully deleted ${successCount} health facilities.`, 
-                icon: "success",
-                background: "#1e293b",
-                color: "#f8fafc",
-              });
-            } else {
-              Swal.fire({
-                title:"Partially Completed", 
-                text:`Deleted ${successCount} successfully. ${failedCount} failed.`, 
-                icon:"warning",
-                background: "#1e293b",
-                color: "#f8fafc",
-              });
-            }
-        } catch (error) {
-            console.error("Error in multi-delete:", error);
-            Swal.fire({
-              title:"Error", 
-              text:"An error occurred during multi-delete.", 
-              icon:"error",
-              background: "#1e293b",
-              color: "#f8fafc",
-            });
-        } finally {
-            setIsDeleting(false);
-            setSelectedItems(new Set());
-            // Re-fetch the first page
-            fetchHealthFacilities(1, searchTerm, selectedTypeFilters.map(f => f.value));
+        if (failedCount === 0) {
+          Swal.fire({
+            title: "Success!",
+            text: `Successfully deleted ${successCount} health facilities.`,
+            icon: "success",
+            background: "#1e293b",
+            color: "#f8fafc",
+          });
+        } else {
+          Swal.fire({
+            title: "Partially Completed",
+            text: `Deleted ${successCount} successfully. ${failedCount} failed.`,
+            icon: "warning",
+            background: "#1e293b",
+            color: "#f8fafc",
+          });
         }
+      } catch (error) {
+        console.error("Error in multi-delete:", error);
+        Swal.fire({
+          title: "Error",
+          text: "An error occurred during multi-delete.",
+          icon: "error",
+          background: "#1e293b",
+          color: "#f8fafc",
+        });
+      } finally {
+        setIsDeleting(false);
+        setSelectedItems(new Set());
+        // Re-fetch the first page
+        fetchHealthFacilities(
+          1,
+          searchTerm,
+          selectedTypeFilters.map((f) => f.value)
+        );
+      }
     }
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedItems(new Set(healthFacilities.map(item => item.id)));
+      setSelectedItems(new Set(healthFacilities.map((item) => item.id)));
     } else {
       setSelectedItems(new Set());
     }
@@ -276,7 +761,7 @@ export default function HealthFacilitiesClientPage() {
     else newSelected.delete(id);
     setSelectedItems(newSelected);
   };
-  
+
   useEffect(() => {
     const initializeData = async () => {
       const storedPermissions = Cookies.get("permissions");
@@ -284,13 +769,13 @@ export default function HealthFacilitiesClientPage() {
 
       if (storedPermissions) {
         try {
-            setUserPermissions(JSON.parse(storedPermissions));
+          setUserPermissions(JSON.parse(storedPermissions));
         } catch {
-            setUserPermissions([]);
+          setUserPermissions([]);
         }
       }
       if (storedRole) setUserRole(storedRole);
-      
+
       await Promise.all([fetchHealthFacilityTypes(), fetchHealthFacilities(1)]);
     };
     initializeData();
@@ -299,47 +784,56 @@ export default function HealthFacilitiesClientPage() {
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-        const typeIds = selectedTypeFilters.map((item) => item.value);
-        fetchHealthFacilities(1, searchTerm, typeIds);
+      const typeIds = selectedTypeFilters.map((item) => item.value);
+      fetchHealthFacilities(1, searchTerm, typeIds);
     }, 400);
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
   }, [searchTerm, selectedTypeFilters, fetchHealthFacilities]);
-  
-  const handlePageChange = useCallback((page: number) => {
+
+  const handlePageChange = useCallback(
+    (page: number) => {
       if (page >= 1 && page <= totalPages) {
-          const typeIds = selectedTypeFilters.map((item) => item.value);
-          fetchHealthFacilities(page, searchTerm, typeIds);
+        const typeIds = selectedTypeFilters.map((item) => item.value);
+        fetchHealthFacilities(page, searchTerm, typeIds);
       }
-  }, [searchTerm, totalPages, fetchHealthFacilities, selectedTypeFilters]);
+    },
+    [searchTerm, totalPages, fetchHealthFacilities, selectedTypeFilters]
+  );
 
   const getPaginationNumbers = () => {
     const delta = 2;
     const range = [];
-    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
-        range.push(i);
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
     }
 
     if (currentPage - delta > 2) {
-        range.unshift("...");
+      range.unshift("...");
     }
     if (currentPage + delta < totalPages - 1) {
-        range.push("...");
+      range.push("...");
     }
 
     range.unshift(1);
     if (totalPages > 1) {
-        range.push(totalPages);
+      range.push(totalPages);
     }
-    
+
     // Remove duplicates that can arise in small number of pages
     return [...new Set(range)];
   };
-  
-  const isAllSelected = healthFacilities.length > 0 && selectedItems.size === healthFacilities.length;
+
+  const isAllSelected =
+    healthFacilities.length > 0 &&
+    selectedItems.size === healthFacilities.length;
   const isIndeterminate = selectedItems.size > 0 && !isAllSelected;
-  
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -351,25 +845,27 @@ export default function HealthFacilitiesClientPage() {
     }
 
     if (error) {
-       return (
-         <div className="bg-red-900/20 text-red-400 p-6 rounded-lg text-center min-h-[40vh] flex flex-col justify-center items-center">
-            <h3 className="text-lg font-bold">Failed to load data</h3>
-            <p>{error}</p>
+      return (
+        <div className="bg-red-900/20 text-red-400 p-6 rounded-lg text-center min-h-[40vh] flex flex-col justify-center items-center">
+          <h3 className="text-lg font-bold">Failed to load data</h3>
+          <p>{error}</p>
         </div>
-       );
+      );
     }
 
     if (healthFacilities.length === 0) {
       return (
-         <div className="bg-gray-900 rounded-lg text-center min-h-[40vh] flex flex-col justify-center items-center p-6">
-            <Hospital className="w-16 h-16 text-gray-600 mb-4" />
-            <h3 className="text-xl font-semibold text-white">No Health Facilities Found</h3>
-            <p className="text-gray-500 mt-2 max-w-sm">
-              {searchTerm || selectedTypeFilters.length > 0
-                ? "Try adjusting your search or filter."
-                : "Get started by adding a new health facility."}
-            </p>
-         </div>
+        <div className="bg-gray-900 rounded-lg text-center min-h-[40vh] flex flex-col justify-center items-center p-6">
+          <Hospital className="w-16 h-16 text-gray-600 mb-4" />
+          <h3 className="text-xl font-semibold text-white">
+            No Health Facilities Found
+          </h3>
+          <p className="text-gray-500 mt-2 max-w-sm">
+            {searchTerm || selectedTypeFilters.length > 0
+              ? "Try adjusting your search or filter."
+              : "Get started by adding a new health facility."}
+          </p>
+        </div>
       );
     }
 
@@ -385,18 +881,32 @@ export default function HealthFacilitiesClientPage() {
                       <input
                         type="checkbox"
                         checked={isAllSelected}
-                        ref={(el) => { if (el) el.indeterminate = isIndeterminate; }}
+                        ref={(el) => {
+                          if (el) el.indeterminate = isIndeterminate;
+                        }}
                         onChange={(e) => handleSelectAll(e.target.checked)}
                         className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                       />
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Facility Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    No
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Facility Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Contact
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -407,41 +917,76 @@ export default function HealthFacilitiesClientPage() {
                         <input
                           type="checkbox"
                           checked={selectedItems.has(facility.id)}
-                          onChange={(e) => handleSelectItem(facility.id, e.target.checked)}
+                          onChange={(e) =>
+                            handleSelectItem(facility.id, e.target.checked)
+                          }
                           className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                         />
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{(currentPage - 1) * perPage + index + 1}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                      {(currentPage - 1) * perPage + index + 1}
+                    </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-white font-medium">{facility.name}</div>
-                        <div className="text-gray-400 text-sm"><code className="px-2 py-1 bg-gray-700 rounded text-xs">{facility.slug}</code></div>
+                        <div className="text-white font-medium">
+                          {facility.name}
+                        </div>
+                        <div className="text-gray-400 text-sm">
+                          <code className="px-2 py-1 bg-gray-700 rounded text-xs">
+                            {facility.slug}
+                          </code>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-300"><span className="px-2 py-1 bg-blue-600 text-white rounded text-sm">{facility.type?.name || "-"}</span></td>
+                    <td className="px-6 py-4 text-gray-300">
+                      <span className="px-2 py-1 bg-blue-600 text-white rounded text-sm">
+                        {facility.type?.name || "-"}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-gray-300 text-sm">
                       <div>
                         <div>{facility.email || "-"}</div>
-                        <div className="text-gray-400">{facility.phone_number || "-"}</div>
+                        <div className="text-gray-400">
+                          {facility.phone_number || "-"}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-300 text-sm">
                       <div>
-                        <div className="font-medium">{facility.city || "-"}</div>
-                        <div className="text-gray-400 truncate max-w-xs">{facility.address || "-"}</div>
+                        <div className="font-medium">
+                          {facility.city || "-"}
+                        </div>
+                        <div className="text-gray-400 truncate max-w-xs">
+                          {facility.address || "-"}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {hasPermission("show-health-facility") && (
-                          <Link href={`/dashboard/health-facilities/${facility.slug}`} className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer"><Eye className="w-4 h-4" /></Link>
+                          <Link
+                            href={`/dashboard/health-facilities/${facility.slug}`}
+                            className="text-blue-400 hover:text-blue-300 p-1 cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
                         )}
                         {hasPermission("update-health-facility") && (
-                          <Link href={`/dashboard/health-facilities/${facility.slug}/edit`} className="text-green-400 hover:text-green-300 p-1 cursor-pointer"><Edit className="w-4 h-4" /></Link>
+                          <Link
+                            href={`/dashboard/health-facilities/${facility.slug}/edit`}
+                            className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Link>
                         )}
                         {hasPermission("delete-health-facility") && (
-                          <button onClick={() => handleDelete(facility.id)} className="text-red-400 hover:text-red-300 p-1 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                          <button
+                            onClick={() => handleDelete(facility.id)}
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -453,20 +998,46 @@ export default function HealthFacilitiesClientPage() {
         </div>
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-              <div className="text-sm text-gray-400">
-                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalHealthFacility)} of {totalHealthFacility} results
-              </div>
-              <div className="flex items-center space-x-1">
-                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors">Previous</button>
-                  {getPaginationNumbers().map((page, index) =>
-                      page === "..." ? (
-                          <span key={index} className="px-3 py-2 text-sm text-gray-500">...</span>
-                      ) : (
-                          <button key={index} onClick={() => handlePageChange(page as number)} className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${currentPage === page ? "bg-blue-600 text-white border-blue-600" : "border-gray-600 text-gray-300 hover:bg-gray-700"}`}>{page}</button>
-                      )
-                  )}
-                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors">Next</button>
-              </div>
+            <div className="text-sm text-gray-400">
+              Showing {(currentPage - 1) * perPage + 1} to{" "}
+              {Math.min(currentPage * perPage, totalHealthFacility)} of{" "}
+              {totalHealthFacility} results
+            </div>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Previous
+              </button>
+              {getPaginationNumbers().map((page, index) =>
+                page === "..." ? (
+                  <span key={index} className="px-3 py-2 text-sm text-gray-500">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={index}
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
+                      currentPage === page
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="cursor-pointer px-3 py-2 text-sm border border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 text-gray-300 transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </>
@@ -485,18 +1056,32 @@ export default function HealthFacilitiesClientPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedItems.size > 0 && hasPermission("delete-health-facility") && (
-            <button
-              onClick={handleMultiDelete}
-              disabled={isDeleting}
-              className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              {isDeleting ? "Deleting..." : `Delete ${selectedItems.size} Items`}
-            </button>
-          )}
+          {selectedItems.size > 0 &&
+            hasPermission("delete-health-facility") && (
+              <button
+                onClick={handleMultiDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {isDeleting
+                  ? "Deleting..."
+                  : `Delete ${selectedItems.size} Items`}
+              </button>
+            )}
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            {isExporting ? "Exporting..." : "Export to Excel"}
+          </button>
           {hasPermission("create-health-facility") && (
-            <Link href="/dashboard/health-facilities/create" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+            <Link
+              href="/dashboard/health-facilities/create"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+            >
               <Plus className="w-4 h-4 mr-2" /> Add Health Facility
             </Link>
           )}
@@ -504,47 +1089,65 @@ export default function HealthFacilitiesClientPage() {
       </div>
 
       <div className="bg-gray-900 p-4 rounded-lg">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-2">
-              <div className="relative w-full md:w-1/2">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                      type="text"
-                      placeholder="Search health facilities by name..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
-                  />
-                  {searchTerm && <X className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white" onClick={() => setSearchTerm("")} />}
-              </div>
-              <div className="w-full md:w-1/2">
-                  <MultiSelectPopover
-                      options={healthFacilityTypes.map((type) => ({ label: type.name, value: type.id }))}
-                      selected={selectedTypeFilters}
-                      onChange={setSelectedTypeFilters}
-                      placeholder="Filter by facility type"
-                  />
-              </div>
-               {selectedTypeFilters.length > 0 && (
-                  <button onClick={() => { setSelectedTypeFilters([]); setSearchTerm(""); }} className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 hover:text-white transition cursor-pointer" title="Clear filter">
-                      <X className="w-4 h-4" />
-                  </button>
-              )}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+          <div className="relative w-full md:w-1/2">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search health facilities by name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
+            />
+            {searchTerm && (
+              <X
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 cursor-pointer hover:text-white"
+                onClick={() => setSearchTerm("")}
+              />
+            )}
           </div>
+          <div className="w-full md:w-1/2">
+            <MultiSelectPopover
+              options={healthFacilityTypes.map((type) => ({
+                label: type.name,
+                value: type.id,
+              }))}
+              selected={selectedTypeFilters}
+              onChange={setSelectedTypeFilters}
+              placeholder="Filter by facility type"
+            />
+          </div>
+          {selectedTypeFilters.length > 0 && (
+            <button
+              onClick={() => {
+                setSelectedTypeFilters([]);
+                setSearchTerm("");
+              }}
+              className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 hover:text-white transition cursor-pointer"
+              title="Clear filter"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {selectedItems.size > 0 && (
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
           <p className="text-blue-300 text-sm">
-            {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""} selected
-            <button onClick={() => setSelectedItems(new Set())} className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer">
+            {selectedItems.size} item{selectedItems.size > 1 ? "s" : ""}{" "}
+            selected
+            <button
+              onClick={() => setSelectedItems(new Set())}
+              className="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer"
+            >
               Clear selection
             </button>
           </p>
         </div>
       )}
-      
-      {renderContent()}
 
+      {renderContent()}
     </div>
   );
 }
