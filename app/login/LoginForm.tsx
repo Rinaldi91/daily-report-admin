@@ -52,7 +52,7 @@ export default function LoginForm(): JSX.Element {
 
     try {
       const res = await axios.post<LoginResponse>(
-        "http://report-api.test/api/login",
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/login`,
         { email, password }
       );
 
@@ -97,13 +97,13 @@ export default function LoginForm(): JSX.Element {
       });
 
       router.push("/dashboard");
-    } catch (error) {
+    } catch (_error) {
       // console.error("Login error:", error);
       setError("Login gagal. Periksa email dan password.");
-      
+
       // ✅ PERBAIKAN: Reset isLoading ke false ketika error
       setIsLoading(false);
-      
+
       await MySwal.fire({
         icon: "error",
         title: "Login Failed",
@@ -342,7 +342,7 @@ export default function LoginForm(): JSX.Element {
             {/* Footer */}
             <div className="mt-8 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
+                Don&#39;t have an account?{" "}
                 <button
                   type="button"
                   className="text-red-600 hover:text-red-700 font-semibold transition-colors duration-200 hover:underline"

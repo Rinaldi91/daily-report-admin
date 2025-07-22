@@ -33,9 +33,9 @@ export default function EditEmployeePage() {
 
         // Mengambil data karyawan, divisi, dan posisi secara bersamaan
         const [employeeRes, divRes, posRes] = await Promise.all([
-          fetch(`http://report-api.test/api/employee/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('http://report-api.test/api/division?all', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('http://report-api.test/api/position?all', { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division?all`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position?all`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
         
         const employeeJson = await employeeRes.json();
@@ -78,7 +78,7 @@ export default function EditEmployeePage() {
         if (!token) throw new Error("Unauthorized");
         
         // Mengirim data sebagai POST, tapi dengan _method=PUT untuk Laravel
-        const res = await fetch(`http://report-api.test/api/employee/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}`, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${token}`,

@@ -40,9 +40,9 @@ export default function EditHealthFacilityPage() {
       try {
         const token = Cookies.get("token");
         const [facilityRes, typesRes, devicesRes] = await Promise.all([
-          fetch(`http://report-api.test/api/health-facility/${slug}`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`http://report-api.test/api/type-of-health-facility?per_page=All`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`http://report-api.test/api/medical-device?page_all=All`, { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${slug}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility?per_page=All`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device?page_all=All`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
         
         const facilityJson = await facilityRes.json();
@@ -86,7 +86,7 @@ export default function EditHealthFacilityPage() {
         type_of_health_facility_id: parseInt(data.type_of_health_facility_id),
       };
 
-      const res = await fetch(`http://report-api.test/api/health-facility/${initialData.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${initialData.id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,

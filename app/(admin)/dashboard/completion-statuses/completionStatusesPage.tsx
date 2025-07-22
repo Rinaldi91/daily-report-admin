@@ -70,7 +70,7 @@ export default function CompletionstatusPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/completion-status?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/completion-status?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -143,8 +143,8 @@ export default function CompletionstatusPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/completion-status/${formData.id}`
-        : "http://report-api.test/api/completion-status";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/completion-status/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/completion-status`;
 
       // Prepare JSON payload
       const payload = {
@@ -229,7 +229,7 @@ export default function CompletionstatusPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/completion-status/${slug}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/completion-status/${slug}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -323,7 +323,7 @@ export default function CompletionstatusPage() {
         }
 
         const deletePromises = selectedCompletionStatus.map((item) =>
-          fetch(`http://report-api.test/api/completion-status/${item.slug}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/completion-status/${item.slug}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,

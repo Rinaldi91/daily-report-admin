@@ -33,8 +33,8 @@ export default function CreateHealthFacilityPage() {
       try {
         const token = Cookies.get("token");
         const [typesRes, devicesRes] = await Promise.all([
-          fetch(`http://report-api.test/api/type-of-health-facility?per_page=All`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`http://report-api.test/api/medical-device?page_all=All`, { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility?per_page=All`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device?page_all=All`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
         const typesJson = await typesRes.json();
         const devicesJson = await devicesRes.json();
@@ -65,7 +65,7 @@ export default function CreateHealthFacilityPage() {
         type_of_health_facility_id: parseInt(data.type_of_health_facility_id),
       };
 
-      const res = await fetch("http://report-api.test/api/health-facility", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

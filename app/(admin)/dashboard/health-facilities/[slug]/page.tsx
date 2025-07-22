@@ -44,7 +44,7 @@ export default function HealthFacilityDetailPage() {
         setError(null);
         try {
           const token = Cookies.get("token");
-          const res = await fetch(`http://report-api.test/api/health-facility/${slug}`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${slug}`, {
             headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
           });
           if (!res.ok) throw new Error("Failed to fetch facility details.");
@@ -62,7 +62,7 @@ export default function HealthFacilityDetailPage() {
 
   const StatusIcon = ({ status }: { status: string }) => {
     const lowerStatus = status.toLowerCase();
-    if (lowerStatus === 'bagus' || lowerStatus === 'good') { // Handle both languages
+    if (lowerStatus === 'Baik' || lowerStatus === 'good') { // Handle both languages
         return <CircleCheck className="w-5 h-5 text-green-500" />;
     }
     if (lowerStatus === 'rusak' || lowerStatus === 'broken') { // Handle both languages
@@ -163,8 +163,8 @@ export default function HealthFacilityDetailPage() {
                                         </p>
                                     </div>
                                     <span className="px-3 py-1 rounded-full text-xs font-medium capitalize" style={{
-                                        backgroundColor: device.status.toLowerCase() === 'bagus' || device.status.toLowerCase() === 'good' ? 'rgba(34, 197, 94, 0.1)' : device.status.toLowerCase() === 'rusak' || device.status.toLowerCase() === 'broken' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)',
-                                        color: device.status.toLowerCase() === 'bagus' || device.status.toLowerCase() === 'good' ? '#22c55e' : device.status.toLowerCase() === 'rusak' || device.status.toLowerCase() === 'broken' ? '#ef4444' : '#eab308'
+                                        backgroundColor: device.status.toLowerCase() === 'Baik' || device.status.toLowerCase() === 'good' ? 'rgba(34, 197, 94, 0.1)' : device.status.toLowerCase() === 'rusak' || device.status.toLowerCase() === 'broken' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)',
+                                        color: device.status.toLowerCase() === 'Baik' || device.status.toLowerCase() === 'good' ? '#22c55e' : device.status.toLowerCase() === 'rusak' || device.status.toLowerCase() === 'broken' ? '#ef4444' : '#eab308'
                                     }}>
                                         {device.status}
                                     </span>

@@ -19,7 +19,7 @@ import {
   CalendarRange,
   Calendar,
   FileSpreadsheet,
-  Printer, // <-- Import Printer icon
+  Printer,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -48,7 +48,7 @@ interface FullReport {
   completed_at: string;
   total_time: string;
   employee: {
-    id: number; // Tambahkan id
+    id: number;
     name: string;
     employee_number: string;
     region: string;
@@ -82,7 +82,6 @@ interface FullReport {
   };
 }
 
-// --- Interface Definition updated for enum status ---
 interface Employee {
   id: number;
   name: string;
@@ -94,7 +93,6 @@ interface HealthFacility {
   name: string;
 }
 
-// The 'status' field now uses a string enum instead of a number.
 interface Report {
   id: number;
   report_number: string;
@@ -155,23 +153,20 @@ export default function ReportsClientPage() {
   const [endDate, setEndDate] = useState<string>("");
 
   const [isExporting, setIsExporting] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false); // <-- State for printing
+  const [isPrinting, setIsPrinting] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
-  // State untuk menyimpan nilai filter
-  const [filterUser, setFilterUser] = useState<string>(""); // Menyimpan ID user
+  const [filterUser, setFilterUser] = useState<string>("");
   const [filterStartDate, setFilterStartDate] = useState<string>("");
   const [filterEndDate, setFilterEndDate] = useState<string>("");
-  // --- END: State baru untuk modal dan filter ---
 
   const [open, setOpen] = useState(false);
-  // State untuk menyimpan teks yang diketik di kotak pencarian
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredEmployees = useMemo(() => {
     if (!searchQuery) {
-      return employees; // Jika tidak ada pencarian, tampilkan semua
+      return employees;
     }
     return employees.filter((emp) =>
       emp.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -205,9 +200,8 @@ export default function ReportsClientPage() {
         if (sDate) params.append("start_date", sDate);
         if (eDate) params.append("end_date", eDate);
 
-        // Assuming the API endpoint remains the same
         const res = await fetch(
-          `http://report-api.test/api/report?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -223,7 +217,6 @@ export default function ReportsClientPage() {
 
         const json = await res.json();
 
-        // The API is now expected to return a 'status' string.
         setReports(Array.isArray(json.data.data) ? json.data.data : []);
         setCurrentPage(json.data.current_page);
         setTotalPages(json.data.last_page);
@@ -236,24 +229,21 @@ export default function ReportsClientPage() {
         setLoading(false);
       }
     },
-    [perPage]
+    [] // Removed perPage from dependencies as it's not needed
   );
 
   const handleFilterToday = () => {
     const today = format(new Date(), "yyyy-MM-dd");
     setStartDate(today);
     setEndDate(today);
-    // Langsung panggil fetchReports dengan tanggal hari ini
     fetchReports(1, searchTerm, today, today);
   };
 
   const handleFilter = () => {
-    // Memanggil fetchReports dengan nilai filter saat ini, kembali ke halaman 1
     fetchReports(1, searchTerm, startDate, endDate);
   };
 
   const handleReset = () => {
-    // Mengosongkan semua state filter dan memanggil fetchReports
     setSearchTerm("");
     setStartDate("");
     setEndDate("");
@@ -265,13 +255,15 @@ export default function ReportsClientPage() {
       const token = Cookies.get("token");
       if (!token) return;
 
-      // Asumsi ada endpoint untuk mengambil semua data karyawan
-      const res = await fetch(`http://report-api.test/api/employee`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (!res.ok) throw new Error("Failed to fetch employees");
 
@@ -282,22 +274,22 @@ export default function ReportsClientPage() {
     }
   };
 
+  // Fixed useEffect with proper dependencies
   useEffect(() => {
-    // Panggil fetchReports saat halaman pertama kali dimuat dan saat halaman berubah
-    fetchReports(currentPage, searchTerm, startDate, endDate); // Pass all required arguments
-  }, [currentPage]);
+    fetchReports(currentPage, searchTerm, startDate, endDate);
+  }, [currentPage, fetchReports, searchTerm, startDate, endDate]);
 
   useEffect(() => {
     const initializeData = async () => {
-      // ... (fungsi initializeData tetap sama)
-      await fetchEmployees(); // Panggil fungsi fetch karyawan saat inisialisasi
+      await fetchEmployees();
     };
     initializeData();
-  }, [fetchReports]);
+  }, []);
 
   const [activeDateFilter, setActiveDateFilter] = useState<
     "today" | "week" | "month" | "year" | null
   >(null);
+
   const setDateFilter = (range: "today" | "week" | "month" | "year") => {
     const today = new Date();
     let start, end;
@@ -340,13 +332,16 @@ export default function ReportsClientPage() {
         const token = Cookies.get("token");
         if (!token) throw new Error("Token not found");
 
-        const res = await fetch(`http://report-api.test/api/report/${id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report/${id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (res.ok) {
           Swal.fire({
@@ -402,26 +397,26 @@ export default function ReportsClientPage() {
     initializeData();
   }, [fetchReports]);
 
+  // Simplified useEffect for search debouncing
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page when searching
       fetchReports(1, searchTerm, startDate, endDate);
     }, 400);
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm, fetchReports, startDate, endDate]);
-
+  }, [searchTerm, startDate, endDate, fetchReports]);
 
   const handlePageChange = useCallback(
     (page: number) => {
       if (page >= 1 && page <= totalPages) {
-        fetchReports(page, searchTerm, startDate, endDate);
+        setCurrentPage(page);
       }
     },
-    [searchTerm, startDate, endDate, totalPages, fetchReports]
+    [totalPages]
   );
-
 
   const getPaginationNumbers = () => {
     const delta = 2;
@@ -537,7 +532,7 @@ export default function ReportsClientPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {reports.map((report, index) => (
+                {reports.map((report, index: number) => (
                   <tr key={report.id} className="hover:bg-gray-800">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {(currentPage - 1) * perPage + index + 1}
@@ -573,12 +568,11 @@ export default function ReportsClientPage() {
                             <Eye className="w-4 h-4" />
                           </Link>
                         )}
-                        {/* Show edit button if status is not 'Completed' */}
                         {hasPermission("update-report") &&
                           report.is_status !== "Completed" && (
                             <Link
                               href={`/dashboard/reports/${report.id}/edit`}
-                              className="text-green-400 hover:text-green-300 p-1 cursor-pointer"
+                              className="text-green-400 hover:text-green-300 p-1 cursor-pointer hidden"
                             >
                               <Edit className="w-4 h-4" />
                             </Link>
@@ -647,122 +641,134 @@ export default function ReportsClientPage() {
     );
   };
 
-    const handlePrint = async () => {
+  const handlePrint = async () => {
     setIsPrinting(true);
     try {
-        const token = Cookies.get("token");
-        if (!token) throw new Error("Unauthorized");
+      const token = Cookies.get("token");
+      if (!token) throw new Error("Unauthorized");
 
-        const params = new URLSearchParams();
-        // Use the main page filters for printing
-        if (searchTerm.trim()) params.append("search", searchTerm);
-        // Use startDate and endDate from the main filter, not the modal's filter
-        if (startDate) params.append("start_date", startDate);
-        if (endDate) params.append("end_date", endDate);
-        // Note: The API must support fetching all records when no page is specified,
-        // or you must loop through all pages. We'll assume the API endpoint
-        // `report-all` is suitable for this.
-        const res = await fetch(
-            `http://report-api.test/api/report-all?${params.toString()}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            }
+      const params = new URLSearchParams();
+      if (searchTerm.trim()) params.append("search", searchTerm);
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report-all?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.message || "Failed to fetch data for printing"
         );
+      }
 
-        if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.message || "Failed to fetch data for printing");
-        }
+      const json = await res.json();
+      const allReports: FullReport[] = Array.isArray(json.data)
+        ? json.data
+        : Array.isArray(json.data.data)
+        ? json.data.data
+        : [];
 
-        const json = await res.json();
-        const allReports: FullReport[] = Array.isArray(json.data)
-            ? json.data
-            : Array.isArray(json.data.data)
-            ? json.data.data
-            : [];
+      if (allReports.length === 0) {
+        Swal.fire(
+          "No Data",
+          "No data matches the selected filters to print.",
+          "info"
+        );
+        return;
+      }
 
-
-        if (allReports.length === 0) {
-            Swal.fire("No Data", "No data matches the selected filters to print.", "info");
-            return;
-        }
-
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Print Reports</title>
-                        <style>
-                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; color: #333; }
-                            table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-                            th, td { padding: 0.75rem; text-align: left; border: 1px solid #dee2e6; }
-                            thead th { background-color: #f8f9fa; border-bottom-width: 2px; }
-                            h1 { text-align: center; margin-bottom: 20px; }
-                            .print-header { display: none; }
-                            @media print {
-                                .no-print { display: none; }
-                                h1 { display: block; }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>Report Data</h1>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Report Number</th>
-                                    <th>Health Facility</th>
-                                    <th>Employee</th>
-                                    <th>Status</th>
-                                    <th>Date Completed</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${allReports.map((report, index) => `
-                                    <tr>
-                                        <td>${index + 1}</td>
-                                        <td>${report.report_number}</td>
-                                        <td>${report.health_facility?.name ?? '-'}</td>
-                                        <td>${report.employee?.name ?? '-'}</td>
-                                        <td>${report.is_status}</td>
-                                        <td>${report.completed_at ? format(new Date(report.completed_at), 'dd-MM-yyyy HH:mm') : '-'}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                        <script>
-                            window.onload = function() {
-                                window.print();
-                                window.onafterprint = function() {
-                                  window.close();
-                                }
-                            };
-                        </script>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-        }
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Reports</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.5; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+                th, td { padding: 0.75rem; text-align: left; border: 1px solid #dee2e6; }
+                thead th { background-color: #f8f9fa; border-bottom-width: 2px; }
+                h1 { text-align: center; margin-bottom: 20px; }
+                .print-header { display: none; }
+                @media print {
+                  .no-print { display: none; }
+                  h1 { display: block; }
+                }
+              </style>
+            </head>
+            <body>
+              <h1>Report Data</h1>
+              <table>
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Report Number</th>
+                    <th>Health Facility</th>
+                    <th>Employee</th>
+                    <th>Status</th>
+                    <th>Date Completed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${allReports
+                    .map(
+                      (report, index) => `
+                    <tr>
+                      <td>${index + 1}</td>
+                      <td>${report.report_number}</td>
+                      <td>${report.health_facility?.name ?? "-"}</td>
+                      <td>${report.employee?.name ?? "-"}</td>
+                      <td>${report.is_status}</td>
+                      <td>${
+                        report.completed_at
+                          ? format(
+                              new Date(report.completed_at),
+                              "dd-MM-yyyy HH:mm"
+                            )
+                          : "-"
+                      }</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.onafterprint = function() {
+                    window.close();
+                  }
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
     } catch (err: unknown) {
-        Swal.fire({
-            title: "Print Failed",
-            text: err instanceof Error ? err.message : "An unexpected error occurred.",
-            icon: "error",
-        });
+      Swal.fire({
+        title: "Print Failed",
+        text:
+          err instanceof Error ? err.message : "An unexpected error occurred.",
+        icon: "error",
+      });
     } finally {
-        setIsPrinting(false);
+      setIsPrinting(false);
     }
-};
+  };
 
   const handleExport = async (format: "xlsx" | "csv" | "json") => {
     setIsExporting(true);
 
-    // NOTE: Backend API Anda perlu diubah untuk menerima parameter filter ini
     try {
       const token = Cookies.get("token");
       if (!token) throw new Error("Unauthorized");
@@ -774,7 +780,7 @@ export default function ReportsClientPage() {
       if (filterEndDate) params.append("end_date", filterEndDate);
 
       const res = await fetch(
-        `http://report-api.test/api/report-all?${params.toString()}`,
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report-all?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -811,7 +817,7 @@ export default function ReportsClientPage() {
       if (format === "csv") exportToCSV(flatData, fileName);
       if (format === "json") downloadJson(allReports, fileName);
 
-      setIsExportModalOpen(false); // Tutup modal setelah berhasil
+      setIsExportModalOpen(false);
     } catch (err: unknown) {
       Swal.fire({
         title: "Export Failed",
@@ -977,23 +983,23 @@ export default function ReportsClientPage() {
               </Link>
             )} */}
             {hasPermission("export-excel") && (
-             <>
-               <button
-                onClick={handlePrint}
-                disabled={isPrinting}
-                className="inline-flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                {isPrinting ? "Printing..." : "Print"}
-              </button>
-              <button
-                onClick={() => setIsExportModalOpen(true)}
-                className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Data
-              </button>
-             </>
+              <>
+                <button
+                  onClick={handlePrint}
+                  disabled={isPrinting}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  {isPrinting ? "Printing..." : "Print"}
+                </button>
+                <button
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Data
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1127,7 +1133,8 @@ export default function ReportsClientPage() {
                     type="button"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full flex items-center justify-between rounded-lg border border-gray-700 px-3 py-2 bg-gray-800 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 cursor-pointer"
+                    aria-controls="employee-listbox"
+                    className="w-full flex items-center justify-between rounded-lg border ..."
                   >
                     <span className="truncate">
                       {filterUser
@@ -1142,6 +1149,7 @@ export default function ReportsClientPage() {
 
                 <Popover.Portal>
                   <Popover.Content
+                    id="employee-listbox"
                     sideOffset={5}
                     align="start"
                     className="w-[607px] items-center rounded-md border border-gray-700 bg-gray-800 p-1 text-white shadow-md z-50"

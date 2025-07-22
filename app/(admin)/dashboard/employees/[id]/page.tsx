@@ -18,7 +18,6 @@ import {
   Calendar,
   BadgeCheck,
   BadgeX,
-  Filter,
   RotateCw,
   CalendarDays,
   CalendarRange,
@@ -248,7 +247,7 @@ export default function EmployeeDetailPage() {
         if (eDate) paginatedParams.append("end_date", eDate);
 
         const resPaginated = await fetch(
-          `http://report-api.test/api/employee/${id}?${paginatedParams.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}?${paginatedParams.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -268,7 +267,7 @@ export default function EmployeeDetailPage() {
         if (sDate) allParams.append("start_date", sDate);
         if (eDate) allParams.append("end_date", eDate);
         const resAll = await fetch(
-          `http://report-api.test/api/employee/${id}?${allParams.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}?${allParams.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -390,7 +389,7 @@ export default function EmployeeDetailPage() {
           <Image
             src={
               employeeInfo.photo_url ||
-              `http://report-api.test/storage/images/logos/LogoArbi.png`
+              `${process.env.NEXT_PUBLIC_BASE_URL_API}/storage/images/logos/LogoArbi.png`
             }
             alt={employeeInfo.name}
             width={128}

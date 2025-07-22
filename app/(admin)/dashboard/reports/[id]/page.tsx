@@ -21,6 +21,7 @@ import {
   X,
   AlertTriangle,
   Printer,
+  Camera, // Tambahkan ikon baru jika diperlukan
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -139,6 +140,8 @@ interface ReportWorkItem {
   completion_status_id: number;
   completed_at: string;
   total_time: string;
+  created_at: string;
+  updated_at: string;
   note: string;
   job_order: string;
   report_work_item_type: ReportWorkItemType[];
@@ -153,6 +156,16 @@ interface Location {
   longitude: string;
   address: string;
 }
+
+// --- START: Interface baru untuk ReportImage ---
+interface ReportImage {
+  id: number;
+  report_id: number;
+  image: string;
+  created_at: string;
+  updated_at: string;
+}
+// --- END: Interface baru untuk ReportImage ---
 
 interface Report {
   id: number;
@@ -176,9 +189,9 @@ interface Report {
   health_facility: HealthFacility;
   report_work_item: ReportWorkItem[];
   location: Location;
+  report_image: ReportImage[]; // Tambahkan properti report_image
 }
 
-// --- START: Komponen Dialog Gambar ---
 // --- START: Komponen Dialog Gambar ---
 const ImageDialog = ({
   imageUrl,
@@ -253,7 +266,7 @@ const ImageDialog = ({
                 console.log("Image loaded successfully:", imageUrl);
                 setIsLoading(false);
               }}
-              onError={(e) => {
+              onError={(_e) => {
                 console.error("Failed to load image:", imageUrl);
                 setIsLoading(false);
                 setIsError(true);
@@ -273,7 +286,6 @@ const ImageDialog = ({
     </div>
   );
 };
-// --- END: Komponen Dialog Gambar ---
 // --- END: Komponen Dialog Gambar ---
 
 export default function ReportDetailPage() {
@@ -304,7 +316,7 @@ export default function ReportDetailPage() {
           };
 
           const reportRes = await fetch(
-            `http://report-api.test/api/report/${id}`,
+            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report/${id}`,
             { headers }
           );
 
@@ -355,7 +367,16 @@ export default function ReportDetailPage() {
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "N/A";
     try {
-      return format(new Date(dateString), "d MMMM yyyy, HH:mm");
+      return format(new Date(dateString), "d MMMM yyyy, HH:mm:ss");
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatTime = (dateString: string | null | undefined) => {
+    if (!dateString) return "N/A";
+    try {
+      return format(new Date(dateString), "HH:mm:ss");
     } catch {
       return dateString;
     }
@@ -663,16 +684,13 @@ export default function ReportDetailPage() {
                   </code>
                 }
               />
+              <InfoRow label="Check-in" value={formatDate(report.created_at)} />
               <InfoRow
-                label="Created At"
-                value={formatDate(report.created_at)}
-              />
-              <InfoRow
-                label="Completed At"
+                label="Completed Report"
                 value={formatDate(report.completed_at)}
               />
               <InfoRow
-                label="Total Waktu"
+                label="Count Time"
                 value={formatTotalWaktu(report.total_time)}
               />
             </InfoCard>
@@ -728,6 +746,7 @@ export default function ReportDetailPage() {
               </div>
             </InfoCard>
 
+            {/* --- START: Perubahan pada Kartu Lokasi --- */}
             {report.location && (
               <InfoCard
                 icon={<MapPin className="text-blue-400 w-6 h-6" />}
@@ -736,15 +755,40 @@ export default function ReportDetailPage() {
                 <div className="text-sm">
                   <p className="text-gray-400 mb-1">Address:</p>
                   <p className="text-white">{report.location.address}</p>
+                </div>
+
+                {/* --- START: Kode yang diubah --- */}
+                <div className="mt-3 flex items-center gap-x-4 gap-y-2 flex-wrap text-sm justify-between">
+                  {/* Link ke Google Maps */}
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${report.location.latitude},${report.location.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline mt-2 inline-block"
+                    className="text-blue-400 hover:underline"
                   >
                     View on Google Maps
                   </a>
+
+                  {/* Link untuk menampilkan dialog gambar (hanya muncul jika ada gambar) */}
+                  {report.report_image?.[0] && (
+                    <button
+                      onClick={() => {
+                        const baseStorageUrl =
+                          process.env.NEXT_PUBLIC_FILE_BASE_URL;
+                        const reportImage = report.report_image[0];
+                        const fullImageUrl = `${baseStorageUrl}/${reportImage.image}`;
+                        setSelectedImage({
+                          url: fullImageUrl,
+                          description: "Check-in Image",
+                        });
+                      }}
+                      className="text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Image Check-in
+                    </button>
+                  )}
                 </div>
+                {/* --- END: Kode yang diubah --- */}
               </InfoCard>
             )}
           </div>
@@ -755,195 +799,253 @@ export default function ReportDetailPage() {
               icon={<Wrench className="text-blue-400 w-6 h-6" />}
               title="Work Items"
             >
-              {groupedWorkItems.length > 0 ? (
-                <div className="space-y-6">
-                  {groupedWorkItems.map(({ device, workItems }) => (
-                    <div
-                      key={device.id}
-                      className="bg-gray-800 p-4 rounded-lg border border-gray-700"
-                    >
-                      <div className="mb-4">
-                        <p className="font-bold text-white text-lg">
-                          {device.brand} {device.model}
-                        </p>
-                        <div className="text-sm text-gray-400 mt-2 space-y-1">
-                          <p>
-                            Serial:{" "}
-                            <span className="font-mono text-gray-300">
-                              {device.serial_number}
-                            </span>
+              {(() => {
+                // Menangani kasus jika tidak ada item pekerjaan sama sekali
+                if (groupedWorkItems.length === 0) {
+                  return <p>No work items found for this report.</p>;
+                }
+
+                // Inisialisasi satu penghitung untuk semua item pekerjaan
+                let overallWorkItemIndex = 0;
+
+                return (
+                  <div className="space-y-6">
+                    {groupedWorkItems.map(({ device, workItems }) => (
+                      <div
+                        key={device.id}
+                        className="bg-gray-800 p-4 rounded-lg border border-gray-700"
+                      >
+                        <div className="mb-4">
+                          <p className="font-bold text-white text-lg">
+                            {device.brand} {device.model}
                           </p>
-                          <p>
-                            Software Ver:{" "}
-                            <span className="font-mono text-gray-300">
-                              {device.software_version || "N/A"}
-                            </span>
-                          </p>
-                          <p>
-                            Status:{" "}
-                            <span className="text-green-400">
-                              {device.status}
-                            </span>
-                          </p>
+                          <div className="text-sm text-gray-400 mt-2 space-y-1">
+                            <p>
+                              Serial:{" "}
+                              <span className="font-mono text-gray-300">
+                                {device.serial_number}
+                              </span>
+                            </p>
+                            <p>
+                              Software Ver:{" "}
+                              <span className="font-mono text-gray-300">
+                                {device.software_version || "N/A"}
+                              </span>
+                            </p>
+                            <p>
+                              Status:{" "}
+                              <span className="text-green-400">
+                                {device.status}
+                              </span>
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      {workItems.map((workItem, index) => (
-                        <div
-                          key={workItem.id}
-                          className="mt-4 pt-4 border-t border-gray-600 space-y-4"
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-semibold text-white">
-                              Work Item #{index + 1}
-                            </h4>
-                            <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded">
-                              {workItem.job_order}
-                            </span>
-                          </div>
+                        {workItems.map((workItem) => {
+                          // Tambahkan nilai penghitung untuk setiap item yang akan ditampilkan
+                          overallWorkItemIndex++;
 
-                          <div className="space-y-3 text-sm">
-                            <div>
-                              <p className="text-gray-400 mb-1">Problem:</p>
-                              <p className="text-white bg-gray-700 p-2 rounded">
-                                {workItem.problem}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-gray-400 mb-1">Error Code:</p>
-                              <p className="text-white font-mono bg-gray-700 p-2 rounded">
-                                {workItem.error_code}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-gray-400 mb-1">
-                                Action Taken:
-                              </p>
-                              <p className="text-white bg-gray-700 p-2 rounded">
-                                {workItem.job_action}
-                              </p>
-                            </div>
-                          </div>
-
-                          {workItem.parameter?.length > 0 && (
-                            <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Cog className="w-5 h-5 text-gray-300" />
-                                <h5 className="font-semibold text-white">
-                                  Parameters Checked
-                                </h5>
+                          return (
+                            <div
+                              key={workItem.id}
+                              className="mt-4 pt-4 border-t border-gray-600 space-y-4"
+                            >
+                              <div className="flex justify-between items-start">
+                                <h4 className="font-semibold text-white">
+                                  {/* Gunakan penghitung keseluruhan yang tidak akan di-reset */}
+                                  Work Item #{overallWorkItemIndex}
+                                </h4>
+                                <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded">
+                                  {workItem.job_order}
+                                </span>
                               </div>
-                              <div className="space-y-2">
-                                {workItem.parameter.map((param) => (
-                                  <div
-                                    key={param.id}
-                                    className="bg-gray-800/60 p-3 rounded-md"
-                                  >
-                                    <p className="text-white font-semibold">
-                                      {param.name}
-                                    </p>
-                                    <p className="text-gray-300 text-xs mt-1">
-                                      Uraian: {param.uraian}
-                                    </p>
-                                    <p className="text-gray-300 text-xs">
-                                      Description: {param.description}
-                                    </p>
+
+                              <div className="space-y-3 text-sm">
+                                <div>
+                                  <p className="text-gray-400 mb-1">Problem:</p>
+                                  <p className="text-white bg-gray-700 p-2 rounded">
+                                    {workItem.problem}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-gray-400 mb-1">
+                                    Error Code:
+                                  </p>
+                                  <p className="text-white font-mono bg-gray-700 p-2 rounded">
+                                    {workItem.error_code}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-gray-400 mb-1">
+                                    Action Taken:
+                                  </p>
+                                  <p className="text-white bg-gray-700 p-2 rounded">
+                                    {workItem.job_action}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {workItem.parameter?.length > 0 && (
+                                <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Cog className="w-5 h-5 text-gray-300" />
+                                    <h5 className="font-semibold text-white">
+                                      Parameters Checked
+                                    </h5>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse">
+                                      <thead>
+                                        <tr className="border-b border-gray-600">
+                                          <th className="text-left p-3 text-white font-semibold bg-gray-800/60">
+                                            Parameter Name
+                                          </th>
+                                          <th className="text-left p-3 text-white font-semibold bg-gray-800/60">
+                                            Uraian
+                                          </th>
+                                          <th className="text-left p-3 text-white font-semibold bg-gray-800/60">
+                                            Description
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {workItem.parameter.map(
+                                          (param, index) => (
+                                            <tr
+                                              key={param.id}
+                                              className={`border-b border-gray-600/50 ${
+                                                index % 2 === 0
+                                                  ? "bg-gray-800/30"
+                                                  : "bg-gray-800/60"
+                                              }`}
+                                            >
+                                              <td className="p-3 text-white font-medium">
+                                                {param.name}
+                                              </td>
+                                              <td className="p-3 text-gray-300 text-sm">
+                                                {param.uraian}
+                                              </td>
+                                              <td className="p-3 text-gray-300 text-sm">
+                                                {param.description}
+                                              </td>
+                                            </tr>
+                                          )
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
 
-                          {workItem.part_used_for_repair?.length > 0 && (
-                            <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Package className="w-5 h-5 text-gray-300" />
-                                <h5 className="font-semibold text-white">
-                                  Parts Used for Repair
-                                </h5>
-                              </div>
-                              <div className="space-y-3">
-                                {workItem.part_used_for_repair.map((part) => (
-                                  <div
-                                    key={part.id}
-                                    className="bg-gray-800/60 p-3 rounded-md"
-                                  >
-                                    <p className="text-white">
-                                      {part.uraian} (Quantity: {part.quantity})
-                                    </p>
-                                    {part.images?.length > 0 && (
-                                      <div className="mt-3">
-                                        <p className="text-gray-400 text-xs font-semibold mb-2">
-                                          Images:
-                                        </p>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                          {part.images.map((img) => (
-                                            <PartImageBox
-                                              key={img.id}
-                                              image={img}
-                                              onImageClick={(url, desc) =>
-                                                setSelectedImage({
-                                                  url: url,
-                                                  description: desc,
-                                                })
-                                              }
-                                            />
-                                          ))}
+                              {workItem.part_used_for_repair?.length > 0 && (
+                                <div className="bg-gray-700/70 p-4 rounded-lg border border-gray-600">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Package className="w-5 h-5 text-gray-300" />
+                                    <h5 className="font-semibold text-white">
+                                      Parts Used for Repair
+                                    </h5>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {workItem.part_used_for_repair.map(
+                                      (part) => (
+                                        <div
+                                          key={part.id}
+                                          className="bg-gray-800/60 p-3 rounded-md"
+                                        >
+                                          <p className="text-white">
+                                            {part.uraian} (Quantity:{" "}
+                                            {part.quantity})
+                                          </p>
+                                          {part.images?.length > 0 && (
+                                            <div className="mt-3">
+                                              <p className="text-gray-400 text-xs font-semibold mb-2">
+                                                Images:
+                                              </p>
+                                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                {part.images.map((img) => (
+                                                  <PartImageBox
+                                                    key={img.id}
+                                                    image={img}
+                                                    onImageClick={(url, desc) =>
+                                                      setSelectedImage({
+                                                        url: url,
+                                                        description: desc,
+                                                      })
+                                                    }
+                                                  />
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
-                                      </div>
+                                      )
                                     )}
                                   </div>
-                                ))}
+                                </div>
+                              )}
+
+                              {workItem.note && (
+                                <div>
+                                  <p className="text-gray-400 mb-1">Notes:</p>
+                                  <p className="text-white bg-gray-700 p-2 rounded">
+                                    {workItem.note}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center pt-2">
+                                <div>
+                                  <p className="text-gray-400 text-sm">
+                                    Work Types:
+                                  </p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {workItem.report_work_item_type.map(
+                                      (workType) => (
+                                        <span
+                                          key={workType.id}
+                                          className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded"
+                                        >
+                                          {workType.type_of_work.name}
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <div className="mb-1 justify-between flex items-center">
+                                    <p className="text-gray-400 text-sm">
+                                      Start Time:
+                                    </p>
+                                    <p className="text-white font-semibold ml-1">
+                                      {formatTime(workItem.created_at)}
+                                    </p>
+
+                                    <p className="text-gray-400 text-sm ml-7">
+                                      End Time:
+                                    </p>
+                                    <p className="text-white font-semibold">
+                                      {formatTime(workItem.updated_at)}
+                                    </p>
+                                  </div>
+                                  <p className="text-gray-400 text-sm">
+                                    Time Spent:
+                                  </p>
+                                  <p className="text-white font-semibold">
+                                    {formatTotalWaktu(workItem.total_time)}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          )}
-
-                          {workItem.note && (
-                            <div>
-                              <p className="text-gray-400 mb-1">Notes:</p>
-                              <p className="text-white bg-gray-700 p-2 rounded">
-                                {workItem.note}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex justify-between items-center pt-2">
-                            <div>
-                              <p className="text-gray-400 text-sm">
-                                Work Types:
-                              </p>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {workItem.report_work_item_type.map(
-                                  (workType) => (
-                                    <span
-                                      key={workType.id}
-                                      className="text-xs bg-blue-900/50 text-blue-300 px-2 py-1 rounded"
-                                    >
-                                      {workType.type_of_work.name}
-                                    </span>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-gray-400 text-sm">
-                                Time Spent:
-                              </p>
-                              <p className="text-white font-semibold">
-                                {formatTotalWaktu(workItem.total_time)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p>No work items found for this report.</p>
-              )}
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </InfoCard>
 
             <InfoCard
@@ -993,10 +1095,7 @@ export default function ReportDetailPage() {
       </div>
       {/* Render komponen PrintLayout sebagai overlay jika isPrinting true */}
       {isPrinting && report && (
-        <PrintLayout
-          report={report as any}
-          onClose={() => setIsPrinting(false)}
-        />
+        <PrintLayout report={report} onClose={() => setIsPrinting(false)} />
       )}
     </>
   );

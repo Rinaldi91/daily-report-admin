@@ -71,7 +71,7 @@ export default function DivisionsPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/division?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -144,8 +144,8 @@ export default function DivisionsPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/division/${formData.id}`
-        : "http://report-api.test/api/division";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division`;
 
       // Prepare JSON payload
       const payload = {
@@ -204,7 +204,7 @@ export default function DivisionsPage() {
         }
       }
     } catch (error) {
-      console.error("Error saving division:", error);
+      console.error("Error saving deparment:", error);
       Swal.fire("Error", "Network error or server unavailable", "error");
     }
   };
@@ -212,7 +212,7 @@ export default function DivisionsPage() {
   const handleDelete = async (id: number) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You will not be able to recover this division!",
+      text: "You will not be able to recover this department!",
       icon: "warning",
       showCancelButton: true,
       background: "#111827",
@@ -230,19 +230,22 @@ export default function DivisionsPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/division/${id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division/${id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         if (res.ok) {
           fetchDivisions();
           Swal.fire({
             title: "Deleted!",
-            text: "Division has been deleted.",
+            text: "Department has been deleted.",
             icon: "success",
             timer: 2000,
             showConfirmButton: false,
@@ -257,13 +260,13 @@ export default function DivisionsPage() {
           const errorData = await res.json();
           Swal.fire(
             "Error",
-            errorData.message || "Failed to delete division",
+            errorData.message || "Failed to delete department",
             "error"
           );
         }
       } catch (error) {
-        console.error("Error deleting division:", error);
-        Swal.fire("Error", "Failed to delete division", "error");
+        console.error("Error deleting department:", error);
+        Swal.fire("Error", "Failed to delete department", "error");
       }
     }
   };
@@ -299,7 +302,7 @@ export default function DivisionsPage() {
     const result = await Swal.fire({
       title: "Delete Multiple Categories?",
       html: `
-            <p>You are about to delete <strong>${selectedItems.size}</strong> divisions:</p>
+            <p>You are about to delete <strong>${selectedItems.size}</strong> departments:</p>
             <p style="font-size: 14px; color: #9CA3AF; margin-top: 8px;">${categoryNames}</p>
             <p style="color: #EF4444; margin-top: 12px;">This action cannot be undone!</p>
           `,
@@ -324,13 +327,16 @@ export default function DivisionsPage() {
         }
 
         const deletePromises = selectedDivisions.map((item) =>
-          fetch(`http://report-api.test/api/division/${item.id}`, {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          })
+          fetch(
+            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division/${item.id}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          )
         );
 
         const results = await Promise.allSettled(deletePromises);
@@ -494,10 +500,11 @@ export default function DivisionsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Layers2 className="w-6 h-6" />Department Management
+              <Layers2 className="w-6 h-6" />
+              Department Management
             </h1>
             <p className="mt-1 text-sm text-gray-400">
-              Manage organizational divisions and departments
+              Manage organizational departments
             </p>
           </div>
 
@@ -520,7 +527,7 @@ export default function DivisionsPage() {
                 onClick={handleAdd}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                <Plus className="w-4 h-4 mr-2" /> Add Division
+                <Plus className="w-4 h-4 mr-2" /> Add Department
               </button>
             )}
           </div>
@@ -532,7 +539,7 @@ export default function DivisionsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search divisions by name..."
+              placeholder="Search depertments by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none bg-gray-800 text-white"
@@ -590,7 +597,7 @@ export default function DivisionsPage() {
                   No
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Division Name
+                  Department Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Slug
@@ -666,7 +673,7 @@ export default function DivisionsPage() {
           {divisions.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="text-gray-400 text-lg mb-2">
-                No divisions found
+                No departments found
               </div>
               <div className="text-gray-500 text-sm">
                 {searchTerm
@@ -675,11 +682,11 @@ export default function DivisionsPage() {
               </div>
             </div>
           )}
-          
+
           {loading && (
             <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gray-900 rounded-lg">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
-              <p className="mt-4 text-gray-400">Loading Health Divisions...</p>
+              <p className="mt-4 text-gray-400">Loading Health Department...</p>
             </div>
           )}
         </div>
@@ -752,14 +759,14 @@ export default function DivisionsPage() {
                 <>
                   <Pencil className="w-5 h-5 text-white" />
                   <Dialog.Title className="text-lg font-semibold text-white">
-                    Edit Division
+                    Edit Department
                   </Dialog.Title>
                 </>
               ) : (
                 <>
                   <PlusCircle className="w-5 h-5 text-white" />
                   <Dialog.Title className="text-lg font-semibold text-white">
-                    Add Division
+                    Add Department
                   </Dialog.Title>
                 </>
               )}
@@ -768,7 +775,7 @@ export default function DivisionsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Division Name
+                  Department Name
                 </label>
                 <input
                   type="text"

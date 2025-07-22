@@ -83,7 +83,7 @@ export default function MedicalDeviceCategoriesPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/medical-device-category?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -160,8 +160,8 @@ export default function MedicalDeviceCategoriesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/medical-device-category/${formData.id}`
-        : "http://report-api.test/api/medical-device-category";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category`;
 
       // Prepare JSON payload
       const payload = {
@@ -247,7 +247,7 @@ export default function MedicalDeviceCategoriesPage() {
         }
 
         const res = await fetch(
-          `http://report-api.test/api/medical-device-category/${slug}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category/${slug}`,
           {
             method: "DELETE",
             headers: {
@@ -344,7 +344,7 @@ export default function MedicalDeviceCategoriesPage() {
 
         const deletePromises = selectedCategories.map((category) =>
           fetch(
-            `http://report-api.test/api/medical-device-category/${category.slug}`,
+            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category/${category.slug}`,
             {
               method: "DELETE",
               headers: {

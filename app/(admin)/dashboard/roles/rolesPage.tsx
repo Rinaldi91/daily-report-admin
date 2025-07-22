@@ -73,7 +73,7 @@ export default function RolesPage() {
         throw new Error("Token not found");
       }
 
-      const res = await fetch("http://report-api.test/api/permission", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
@@ -118,7 +118,7 @@ export default function RolesPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/roles?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -183,8 +183,8 @@ export default function RolesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/roles/${formData.id}`
-        : "http://report-api.test/api/roles";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles`;
 
       // Prepare JSON payload
       const payload = {
@@ -271,7 +271,7 @@ export default function RolesPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/roles/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -365,7 +365,7 @@ export default function RolesPage() {
         }
 
         const deletePromises = selectedPermissions.map((item) =>
-          fetch(`http://report-api.test/api/roles/${item.id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles/${item.id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,

@@ -3,15 +3,8 @@ import { format } from "date-fns";
 import { ImageIcon, Printer, X } from "lucide-react";
 import Image from "next/image";
 
-// --- INTERFACE (sama seperti sebelumnya) ---
+// --- INTERFACE (Tidak ada perubahan) ---
 type ReportStatus = "Progress" | "Pending" | "Completed";
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role_id: number;
-}
 
 interface Employee {
   id: number;
@@ -87,7 +80,7 @@ interface ReportWorkItemType {
 
 interface PartImage {
   id: number;
-  image: string; // Diasumsikan ini adalah URL/base64 gambar
+  image: string;
   description: string;
 }
 
@@ -96,6 +89,13 @@ interface PartUsedForRepair {
   uraian: string;
   quantity: string;
   images: PartImage[];
+}
+
+interface Parameter {
+  id: number;
+  name: string;
+  uraian: string;
+  description: string;
 }
 
 interface ReportWorkItem {
@@ -134,8 +134,8 @@ interface Report {
   customer_phone: string;
   note: string | null;
   suggestion: string;
-  attendance_customer: string; // Diasumsikan ini adalah URL/base64 gambar tanda tangan
-  attendance_employee: string; // Diasumsikan ini adalah URL/base64 gambar tanda tangan
+  attendance_customer: string;
+  attendance_employee: string;
   completed_at: string;
   total_time: string;
   employee: Employee;
@@ -143,170 +143,321 @@ interface Report {
   report_work_item: ReportWorkItem[];
   location: Location;
 }
-// --- AKHIR INTERFACE ---
 
 interface PrintLayoutProps {
   report: Report;
   onClose: () => void;
 }
 
-// --- PENAMBAHAN DI SINI: Interface Parameter ---
-interface Parameter {
-  id: number;
-  name: string;
-  uraian: string;
-  description: string;
-}
+// --- FUNGSI BANTU & KOMPONEN KECIL (Tidak ada perubahan) ---
+const safeFormatDate = (
+  dateString: string | null | undefined,
+  fallback: string
+) => {
+  if (dateString && !isNaN(new Date(dateString).getTime())) {
+    return format(new Date(dateString), "dd MMMM yyyy");
+  }
+  return fallback;
+};
 
-const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
-  const workItem = report?.report_work_item?.[0];
-  const device = workItem
-    ? report?.health_facility?.medical_devices?.find(
-        (d) => d.id === workItem.medical_device_id
-      )
+const PartImageBox = ({
+  image,
+  onImageClick,
+}: {
+  image: PartImage;
+  onImageClick: (url: string, description: string) => void;
+}) => {
+  const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
+  const fullImageUrl = image.image
+    ? `${baseStorageUrl}/parts_used_images/${image.image}`
     : null;
 
-  const safeFormatDate = (
-    dateString: string | null | undefined,
-    fallback: string
-  ) => {
-    if (dateString && !isNaN(new Date(dateString).getTime())) {
-      return format(new Date(dateString), "dd MMMM yyyy");
+  const handleClick = () => {
+    if (fullImageUrl) {
+      onImageClick(fullImageUrl, image.description || "Part image");
     }
-    return fallback;
   };
 
-  const reportDate = safeFormatDate(report?.completed_at, "-");
+  return (
+    <div
+      className="relative w-[200px] h-[250px] rounded-lg border overflow-hidden cursor-pointer group"
+      onClick={handleClick}
+    >
+      {/* Gambar atau Placeholder */}
+      {fullImageUrl ? (
+        <Image
+          src={fullImageUrl}
+          alt={image.description || "Part image"}
+          fill
+          style={{ objectFit: "cover" }} // Menggunakan 'cover' agar gambar memenuhi area
+          className="transition-transform duration-300 group-hover:scale-110" // Efek zoom saat hover
+          onError={(e) => {
+            console.error("Failed to load part image:", fullImageUrl);
+            const target = e.currentTarget as HTMLImageElement;
+            target.style.display = "none";
+
+            // Menampilkan placeholder jika gambar error
+            const parent = target.parentElement;
+            if (parent) {
+              const placeholder = parent.querySelector(".placeholder-icon");
+              if (placeholder) {
+                (placeholder as HTMLElement).style.display = "flex";
+              }
+            }
+          }}
+        />
+      ) : null}
+
+      {/* Placeholder Icon (ditampilkan jika tidak ada gambar atau saat error) */}
+      <div
+        className={`placeholder-icon w-full h-full items-center justify-center bg-gray-100 ${
+          fullImageUrl ? "hidden" : "flex"
+        }`}
+      >
+        <ImageIcon className="w-10 h-10 text-gray-400" />
+      </div>
+
+      {/* Deskripsi sebagai Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 p-2 bg-black bg-opacity-60 text-center">
+        <p className="text-xs text-white truncate">
+          {image.description || "No description"}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const SignatureBox = ({
+  title,
+  url,
+}: {
+  title: string;
+  url: string | null;
+}) => {
+  const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
+  let fullImageUrl = null;
+
+  if (url) {
+    let folderPath = "";
+    if (url.includes("customer_signature")) {
+      folderPath = "signatures/customer_signatures";
+    } else if (url.includes("employee_signature")) {
+      folderPath = "signatures/employee_signatures";
+    } else {
+      folderPath = "signatures";
+    }
+    fullImageUrl = `${baseStorageUrl}/${folderPath}/${url}`;
+  }
+
+  return (
+    <div className="p-4 rounded-lg text-center flex flex-col">
+      <p className="text-sm font-semibold text-white">{title}</p>
+      <div className="relative flex-grow w-full h-24 rounded-md">
+        {fullImageUrl ? (
+          <Image
+            src={fullImageUrl}
+            alt={`${title}`}
+            fill
+            style={{ objectFit: "contain" }}
+            className="bg-white rounded-md p-1"
+            onError={(e) => {
+              console.error("Failed to load image:", fullImageUrl);
+              const target = e.currentTarget as HTMLImageElement;
+              target.style.display = "none";
+              const parent = target.parentElement;
+              if (parent) {
+                const placeholder = parent.querySelector(".placeholder-icon");
+                if (placeholder)
+                  (placeholder as HTMLElement).style.display = "flex";
+              }
+            }}
+          />
+        ) : null}
+        <div
+          className={`w-full h-full flex items-center justify-center placeholder-icon ${
+            fullImageUrl ? "hidden" : ""
+          }`}
+        >
+          <ImageIcon className="w-8 h-8 text-gray-500" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- PEMBARUAN DI SINI: KOMPONEN BARU UNTUK DETAIL SETIAP PEKERJAAN ---
+interface WorkItemDetailsProps {
+  report: Report;
+  workItem: ReportWorkItem;
+  index: number;
+}
+
+const WorkItemDetails: React.FC<WorkItemDetailsProps> = ({
+  report,
+  workItem,
+  index,
+}) => {
+  const device = report?.health_facility?.medical_devices?.find(
+    (d) => d.id === workItem.medical_device_id
+  );
+
   const completionDate = safeFormatDate(workItem?.completed_at, "In Progress");
   const typesOfWork =
     workItem?.report_work_item_type
       ?.map((item) => item.type_of_work.name)
       .join(", ") || "-";
 
-  const PartImageBox = ({
-    image,
-    onImageClick,
-  }: {
-    image: PartImage;
-    onImageClick: (url: string, description: string) => void;
-  }) => {
-    const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
-    const fullImageUrl = image.image
-      ? `${baseStorageUrl}/parts_used_images/${image.image}`
-      : null;
-
-    const handleClick = () => {
-      if (fullImageUrl) {
-        onImageClick(fullImageUrl, image.description || "Part image");
-      }
-    };
-
-    return (
-      <div
-        className="relative w-[200px] h-[250px] rounded-lg border overflow-hidden cursor-pointer group"
-        onClick={handleClick}
-      >
-        {/* Gambar atau Placeholder */}
-        {fullImageUrl ? (
-          <Image
-            src={fullImageUrl}
-            alt={image.description || "Part image"}
-            fill
-            style={{ objectFit: "cover" }} // Menggunakan 'cover' agar gambar memenuhi area
-            className="transition-transform duration-300 group-hover:scale-110" // Efek zoom saat hover
-            onError={(e) => {
-              console.error("Failed to load part image:", fullImageUrl);
-              const target = e.currentTarget as HTMLImageElement;
-              target.style.display = "none";
-
-              // Menampilkan placeholder jika gambar error
-              const parent = target.parentElement;
-              if (parent) {
-                const placeholder = parent.querySelector(".placeholder-icon");
-                if (placeholder) {
-                  (placeholder as HTMLElement).style.display = "flex";
-                }
-              }
-            }}
-          />
-        ) : null}
-
-        {/* Placeholder Icon (ditampilkan jika tidak ada gambar atau saat error) */}
-        <div
-          className={`placeholder-icon w-full h-full items-center justify-center bg-gray-100 ${
-            fullImageUrl ? "hidden" : "flex"
-          }`}
-        >
-          <ImageIcon className="w-10 h-10 text-gray-400" />
-        </div>
-
-        {/* Deskripsi sebagai Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-black bg-opacity-60 text-center">
-          <p className="text-xs text-white truncate">
-            {image.description || "No description"}
-          </p>
-        </div>
+  return (
+    <section className="space-y-4 print-section break-after-page">
+      {/* -- Judul untuk setiap item pekerjaan -- */}
+      <div className="pt-6 pb-2 mb-4 border-b-2 border-gray-400 border-dashed">
+        <h3 className="text-xl font-bold text-gray-800">
+          Service Details #{index + 1}
+        </h3>
       </div>
-    );
-  };
 
-  const SignatureBox = ({
-    title,
-    url,
-  }: {
-    title: string;
-    url: string | null;
-  }) => {
-    const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
-    let fullImageUrl = null;
-
-    if (url) {
-      let folderPath = "";
-      if (url.includes("customer_signature")) {
-        folderPath = "signatures/customer_signatures";
-      } else if (url.includes("employee_signature")) {
-        folderPath = "signatures/employee_signatures";
-      } else {
-        folderPath = "signatures";
-      }
-      fullImageUrl = `${baseStorageUrl}/${folderPath}/${url}`;
-    }
-
-    return (
-      <div className="p-4 rounded-lg text-center flex flex-col">
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <div className="relative flex-grow w-full h-24 rounded-md">
-          {fullImageUrl ? (
-            <Image
-              src={fullImageUrl}
-              alt={`${title}`}
-              fill
-              style={{ objectFit: "contain" }}
-              className="bg-white rounded-md p-1"
-              onError={(e) => {
-                console.error("Failed to load image:", fullImageUrl);
-                const target = e.currentTarget as HTMLImageElement;
-                target.style.display = "none";
-                const parent = target.parentElement;
-                if (parent) {
-                  const placeholder = parent.querySelector(".placeholder-icon");
-                  if (placeholder)
-                    (placeholder as HTMLElement).style.display = "flex";
-                }
-              }}
-            />
-          ) : null}
-          <div
-            className={`w-full h-full flex items-center justify-center placeholder-icon ${
-              fullImageUrl ? "hidden" : ""
-            }`}
-          >
-            <ImageIcon className="w-8 h-8 text-gray-500" />
+      {/* -- Detail Perangkat -- */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <h3 className="text-lg font-semibold text-gray-950 border-b border-gray-200 pb-2 mb-3">
+          Device Details
+        </h3>
+        <div className="grid grid-cols-3 gap-x-8 gap-y-3 text-sm">
+          <p className="text-gray-950">
+            <span className="font-semibold">Brand:</span> {device?.brand ?? "-"}
+          </p>
+          <p className="text-gray-950">
+            <span className="font-semibold">Model/Type:</span>{" "}
+            {device?.model ?? "-"}
+          </p>
+          <p className="text-gray-950">
+            <span className="font-semibold">Serial Number:</span>{" "}
+            {device?.serial_number ?? "-"}
+          </p>
+          <p className="text-gray-950">
+            <span className="font-semibold">Software Version:</span>{" "}
+            {device?.software_version ?? "N/A"}
+          </p>
+          <div className="col-span-2">
+            <p className="text-gray-950">
+              <span className="font-semibold">Status:</span>{" "}
+              {device?.status ?? "-"}
+            </p>
           </div>
         </div>
       </div>
-    );
-  };
+
+      {/* -- Detail Pekerjaan -- */}
+      <div className="grid grid-cols-2 gap-4 text-center">
+        <div className="bg-gray-100 p-3 rounded-lg">
+          <p className="text-sm font-semibold text-gray-950">Completion Date</p>
+          <p className="font-medium text-gray-800">{completionDate}</p>
+        </div>
+        <div className="bg-gray-100 p-3 rounded-lg">
+          <p className="text-sm font-semibold text-gray-950">Job Order</p>
+          <p className="font-medium text-gray-800">
+            {workItem?.job_order ?? "-"}
+          </p>
+        </div>
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-950">Type of Work:</h4>
+        <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
+          {typesOfWork}
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-950">Problem / Complaint:</h4>
+        <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
+          {workItem?.problem ?? "-"}
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-950">Error Code:</h4>
+        <p className="text-gray-950 font-mono mt-1 p-3 bg-gray-100 rounded-md">
+          {workItem?.error_code ?? "-"}
+        </p>
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-950">Action Taken:</h4>
+        <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md whitespace-pre-wrap">
+          {workItem?.job_action ?? "-"}
+        </p>
+      </div>
+
+      {/* -- Tabel Parameter -- */}
+      {workItem.parameter && workItem.parameter.length > 0 && (
+        <div>
+          <h4 className="font-semibold text-gray-950">Parameters:</h4>
+          <div className="mt-1 border border-gray-200 rounded-md">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-100 text-left">
+                <tr>
+                  <th className="p-2 font-semibold text-gray-950">Parameter</th>
+                  <th className="p-2 font-semibold text-gray-950">
+                    Uraian
+                  </th>
+                  <th className="p-2 font-semibold text-gray-950">
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 text-gray-950">
+                {workItem.parameter.map((param) => (
+                  <tr key={param.id}>
+                    <td className="p-2 w-1/3 text-gray-950">{param.name}</td>
+                    <td className="p-2 text-gray-950">{param.uraian}</td>
+                    <td className="p-2 text-gray-950">{param.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* -- Suku Cadang yang Digunakan -- */}
+      {workItem.part_used_for_repair &&
+        workItem.part_used_for_repair.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-gray-950">
+              Parts Used for Repair:
+            </h4>
+            <div className="space-y-4 mt-2">
+              {workItem.part_used_for_repair.map((part) => (
+                <div key={part.id} className="p-3 rounded-lg">
+                  <div className="flex justify-between items-center mb-2 pb-2 border-b">
+                    <p className="font-medium">{part.uraian}</p>
+                    <p className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
+                      Qty: {part.quantity}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {part.images.map((img) => (
+                      <PartImageBox
+                        key={img.id}
+                        image={img}
+                        onImageClick={() => {}}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      <div>
+        <h4 className="font-semibold text-gray-950">Work Item Note:</h4>
+        <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
+          {workItem?.note ?? "-"}
+        </p>
+      </div>
+    </section>
+  );
+};
+
+// --- PEMBARUAN DI SINI: PRINTCONTENT SEKARANG MELAKUKAN LOOPING ---
+const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
+  const reportDate = safeFormatDate(report?.completed_at, "-");
 
   return (
     <div className="a4-paper space-y-6">
@@ -329,7 +480,7 @@ const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
       </header>
 
       <main className="space-y-6">
-        {/* ... (bagian info utama & detail perangkat tidak berubah) ... */}
+        {/* -- Informasi Umum Laporan -- */}
         <section className="print-section grid grid-cols-2 gap-8">
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
@@ -362,162 +513,44 @@ const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
             </div>
           </div>
         </section>
-        <section className="grid grid-cols-3 gap-4">
+
+        <section className="grid grid-cols-2 gap-4">
           <div className="bg-gray-100 p-3 rounded-lg text-center">
             <p className="text-sm font-semibold text-gray-950">Report Date</p>
             <p className="font-medium text-gray-800">{reportDate}</p>
           </div>
-          <div className="bg-gray-100 p-3 rounded-lg text-center">
-            <p className="text-sm font-semibold text-gray-950">
-              Completion Date
-            </p>
-            <p className="font-medium text-gray-800">{completionDate}</p>
-          </div>
           <div className="bg-green-100 p-3 rounded-lg text-center">
-            <p className="text-sm font-semibold text-green-700">Status</p>
+            <p className="text-sm font-semibold text-green-700">
+              Overall Status
+            </p>
             <p className="font-bold text-green-800 uppercase">
               {report.is_status}
             </p>
           </div>
         </section>
-        <section className="border border-gray-200 rounded-lg p-4 space-y-3">
-          <h3 className="text-lg font-semibold text-gray-950 border-b border-gray-200 pb-2 mb-3">
-            Device Details
-          </h3>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            <p className="text-gray-950">
-              <span className="font-semibold text-gray-950">Brand:</span>{" "}
-              {device?.brand ?? "-"}
-            </p>
-            <p className="text-gray-950">
-              <span className="font-semibold text-gray-950">Model/Type:</span>{" "}
-              {device?.model ?? "-"}
-            </p>
-            <p className="text-gray-950">
-              <span className="font-semibold text-gray-950">
-                Serial Number:
-              </span>{" "}
-              {device?.serial_number ?? "-"}
-            </p>
-            <p className="text-gray-950">
-              <span className="font-semibold text-gray-950">
-                Software Version:
-              </span>{" "}
-              {device?.software_version ?? "-"}
-            </p>
-            <div className="col-span-2">
-              <p className="text-gray-950">
-                <span className="font-semibold text-gray-950">
-                  Device Notes:
-                </span>{" "}
-                {device?.notes ?? "-"}
-              </p>
-            </div>
-          </div>
-        </section>
-        <section className="space-y-4">
-          <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-3">
-              <h4 className="font-semibold text-gray-950">Type of Work:</h4>
-              <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
-                {typesOfWork}
-              </p>
-            </div>
-            <div className="col-span-2">
-              <h4 className="font-semibold text-gray-950">Job Order:</h4>
-              <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
-                {workItem?.job_order ?? "-"}
-              </p>
-            </div>
-          </div>
+
+        {/* -- LOOPING UNTUK SETIAP ITEM PEKERJAAN -- */}
+        {report.report_work_item?.map((workItem, index) => (
+          <WorkItemDetails
+            key={workItem.id}
+            report={report}
+            workItem={workItem}
+            index={index}
+          />
+        ))}
+
+        {/* -- Saran Umum & Catatan -- */}
+        <section className="space-y-4 pt-6 border-t border-gray-200">
           <div>
             <h4 className="font-semibold text-gray-950">
-              Problem / Complaint:
+              Note:
             </h4>
             <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
-              {workItem?.problem ?? "-"}
+              {report.note ?? "-"}
             </p>
           </div>
-          <div>
-            <h4 className="font-semibold text-gray-950">Error Code:</h4>
-            <p className="text-gray-950 font-mono mt-1 p-3 bg-gray-100 rounded-md">
-              {workItem?.error_code ?? "-"}
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-950">Action Taken:</h4>
-            <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md whitespace-pre-wrap">
-              {workItem?.job_action ?? "-"}
-            </p>
-          </div>
-          {/* --- PENAMBAHAN DI SINI: Menampilkan tabel parameter --- */}
-          {workItem && workItem.parameter && workItem.parameter.length > 0 && (
-            <div>
-              <h4 className="font-semibold text-gray-950">Parameters:</h4>
-              <div className="mt-1 border border-gray-200 rounded-md">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-100 text-left">
-                    <tr>
-                      <th className="p-2 font-semibold text-gray-950">
-                        Parameter
-                      </th>
-                      <th className="p-2 font-semibold text-gray-950">
-                        Uraian / Hasil
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {workItem.parameter.map((param) => (
-                      <tr key={param.id}>
-                        <td className="p-2 w-1/3 text-gray-950">
-                          {param.name}
-                        </td>
-                        <td className="p-2 text-gray-950">{param.uraian}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* --- PERUBAHAN DI SINI: MENAMPILKAN GAMBAR SUKU CADANG --- */}
-          {workItem &&
-            workItem.part_used_for_repair &&
-            workItem.part_used_for_repair.length > 0 && (
-              <div>
-                <h4 className="font-semibold text-gray-950">
-                  Parts Used for Repair:
-                </h4>
-                <div className="space-y-4 mt-2">
-                  {workItem.part_used_for_repair.map((part) => (
-                    <div key={part.id} className="p-3 rounded-lg print-section">
-                      <div className="flex justify-between items-center mb-2 pb-2 border-b">
-                        <p className="font-medium text-gray-950">
-                          {part.uraian}
-                        </p>
-                        <p className="text-gray-950 text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
-                          Qty: {part.quantity}
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {part.images.map((img) => (
-                          <PartImageBox
-                            key={img.id}
-                            image={img}
-                            onImageClick={function (
-                              url: string,
-                              description: string
-                            ): void {}}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
+        </section>
+        <section className="space-y-4 pt-6 border-t border-gray-200">
           <div>
             <h4 className="font-semibold text-gray-950">
               Suggestion / Recommendation:
@@ -526,34 +559,22 @@ const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
               {report.suggestion ?? "-"}
             </p>
           </div>
-          <div>
-            <h4 className="font-semibold text-gray-950">Work Item Note:</h4>
-            <p className="text-gray-950 mt-1 p-3 bg-gray-100 rounded-md">
-              {workItem?.note ?? "-"}
-            </p>
-          </div>
         </section>
       </main>
 
-      {/* --- PERUBAHAN DI SINI: MENAMPILKAN GAMBAR TANDA TANGAN --- */}
+      {/* Footer dengan Tanda Tangan */}
       <footer className="pt-8 border-t border-gray-200 mt-10">
         <div className="grid grid-cols-2 gap-8 text-center">
           <div>
             <p className="mb-4 text-sm text-gray-950">Technician Signature,</p>
-            <SignatureBox
-              title=""
-              url={report.attendance_employee}
-            />
+            <SignatureBox title="" url={report.attendance_employee} />
             <p className="text-gray-950 font-semibold border-t border-gray-300 pt-2 mt-2">
               {report?.employee?.name}
             </p>
           </div>
           <div>
             <p className="mb-4 text-sm text-gray-950">Customer Signature,</p>
-            <SignatureBox
-              title=""
-              url={report.attendance_customer}
-            />
+            <SignatureBox title="" url={report.attendance_customer} />
             <p className="text-gray-950 font-semibold border-t border-gray-300 pt-2 mt-2">
               {report.customer_name}
             </p>
@@ -567,6 +588,7 @@ const PrintContent: React.FC<{ report: Report }> = ({ report }) => {
   );
 };
 
+// --- KOMPONEN UTAMA PRINTLAYOUT (Tidak ada perubahan) ---
 const PrintLayout: React.FC<PrintLayoutProps> = ({ report, onClose }) => {
   const handlePrint = () => {
     const printContent = document.querySelector(".print-only");
@@ -574,42 +596,6 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ report, onClose }) => {
       console.error("Elemen .print-only tidak ditemukan!");
       return;
     }
-    const printStyles = `
-      <style>
-        @media print {
-          /* Atur lebar konten utama di sini */
-          .a4-paper {
-            width: 100%; /* Default: Gunakan lebar penuh area cetak */
-            /* width: 180mm; */ /* Contoh: Lebar tetap 17cm */
-            /* max-width: 800px; */ /* Contoh: Lebar maksimal 800px */
-            margin: 0 auto; /* Pusatkan konten jika lebarnya tetap */
-          }
-
-          /* Pastikan semua style lain dari file sebelumnya tetap ada */
-          body, html {
-            background-color: #fff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .print-section {
-            page-break-inside: avoid !important;
-          }
-          @page {
-            size: A4;
-            margin: 20mm;
-            @bottom-center {
-              content: "Page " counter(page);
-              font-size: 10pt;
-              color: #666;
-            }
-          }
-          body {
-            counter-reset: page;
-          }
-        }
-      </style>
-    `;
-    const originalContent = document.body.innerHTML;
     document.body.innerHTML = printContent.innerHTML;
     window.print();
     window.location.reload();
@@ -658,9 +644,19 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ report, onClose }) => {
           .non-printable {
             display: none !important;
           }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .print-only {
             display: block !important;
             position: static;
+          }
+          .print-section {
+            break-inside: avoid;
+          }
+          .break-after-page {
+            break-after: page;
           }
         }
         .print-only {

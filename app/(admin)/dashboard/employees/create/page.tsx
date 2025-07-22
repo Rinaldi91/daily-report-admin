@@ -27,8 +27,8 @@ export default function CreateEmployeePage() {
         if (!token) throw new Error("Unauthorized");
         
         const [divRes, posRes] = await Promise.all([
-            fetch('http://report-api.test/api/division?all', { headers: { Authorization: `Bearer ${token}` } }),
-            fetch('http://report-api.test/api/position?all', { headers: { Authorization: `Bearer ${token}` } })
+            fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division?all`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position?all`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
         const divJson = await divRes.json();
@@ -60,7 +60,7 @@ export default function CreateEmployeePage() {
         
         // Saat menggunakan FormData, browser akan otomatis mengatur Content-Type.
         // Jadi, kita tidak perlu menentukannya secara manual.
-        const res = await fetch('http://report-api.test/api/employee', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee`, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${token}`,

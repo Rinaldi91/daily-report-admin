@@ -66,10 +66,10 @@ export default function EmployeesClientPage() {
     try {
       const token = Cookies.get("token");
       const [divRes, posRes] = await Promise.all([
-        fetch("http://report-api.test/api/division?all", {
+        fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/division?all`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch("http://report-api.test/api/position?all", {
+        fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position?all`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -101,7 +101,7 @@ export default function EmployeesClientPage() {
         if (selectedIsActive) params.append("is_active", selectedIsActive);
 
         const res = await fetch(
-          `http://report-api.test/api/employee?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -145,7 +145,7 @@ export default function EmployeesClientPage() {
     if (result.isConfirmed) {
       try {
         const token = Cookies.get("token");
-        const res = await fetch(`http://report-api.test/api/employee/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -219,7 +219,7 @@ export default function EmployeesClientPage() {
         if (!token) throw new Error("Token not found");
 
         const deletePromises = Array.from(selectedItems).map((id) =>
-          fetch(`http://report-api.test/api/employee/${id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/employee/${id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -423,7 +423,7 @@ export default function EmployeesClientPage() {
                   Contact
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Division
+                  Department
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider">
                   Status
@@ -465,7 +465,7 @@ export default function EmployeesClientPage() {
                           className="rounded-full object-cover"
                           src={
                             employee.photo_url ||
-                            "http://report-api.test/storage/images/logos/LogoArbi.png"
+                            "${process.env.NEXT_PUBLIC_BASE_URL_API}/storage/images/logos/LogoArbi.png"
                           }
                           alt={employee.name}
                           fill

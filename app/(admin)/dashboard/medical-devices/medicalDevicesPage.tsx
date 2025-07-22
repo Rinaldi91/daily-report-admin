@@ -92,7 +92,7 @@ export default function MedicalDevicesPage() {
       if (!token) throw new Error("Unauthorized");
 
       const res = await fetch(
-        `http://report-api.test/api/medical-device-category?per_page=All`,
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device-category?per_page=All`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -136,7 +136,7 @@ export default function MedicalDevicesPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/medical-device?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -242,7 +242,7 @@ export default function MedicalDevicesPage() {
         if (!token) throw new Error("Token not found");
 
         const deletePromises = selectedList.map((device) =>
-          fetch(`http://report-api.test/api/medical-device/${device.id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device/${device.id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -333,8 +333,8 @@ export default function MedicalDevicesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/medical-device/${formData.id}`
-        : "http://report-api.test/api/medical-device";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device`;
 
       const payload = {
         medical_device_category_id: parseInt(
@@ -432,7 +432,7 @@ export default function MedicalDevicesPage() {
         }
 
         const res = await fetch(
-          `http://report-api.test/api/medical-device/${id}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/medical-device/${id}`,
           {
             method: "DELETE",
             headers: {
@@ -479,7 +479,7 @@ export default function MedicalDevicesPage() {
 
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "bagus":
+      case "Baik":
       case "good":
         return "bg-green-600";
       case "rusak":
@@ -1001,10 +1001,9 @@ export default function MedicalDevicesPage() {
                   className="w-full px-3 py-2 rounded bg-gray-700 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Select status</option>
-                  <option value="Bagus">Bagus</option>
+                  <option value="Baik">Baik</option>
                   <option value="Rusak">Rusak</option>
-                  <option value="Maintenance">Maintenance</option>
-                  <option value="Tidak Digunakan / Nonakftf">
+                  <option value="Tidak Digunakan / Nonaktif">
                     Tidak Digunakan / Nonaktif
                   </option>
                 </select>

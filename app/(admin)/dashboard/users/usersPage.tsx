@@ -147,14 +147,17 @@ export default function UsersPage() {
       const token = Cookies.get("token");
       if (!token) return;
 
-      const response = await fetch("http://report-api.test/api/roles", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/roles`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -186,7 +189,7 @@ export default function UsersPage() {
         }
 
         const response = await fetch(
-          `http://report-api.test/api/users?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users?${params.toString()}`,
           {
             method: "GET",
             headers: {
@@ -228,14 +231,17 @@ export default function UsersPage() {
       const token = Cookies.get("token");
       if (!token) return null;
 
-      const response = await fetch(`http://report-api.test/api/users/${id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users/${id}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -356,20 +362,19 @@ export default function UsersPage() {
       const token = Cookies.get("token");
       const isEdit = !!selectedUser?.id;
       const url = isEdit
-        ? `http://report-api.test/api/users/${selectedUser.id}`
-        : `http://report-api.test/api/users`;
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users/${selectedUser.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users`;
 
       const method = isEdit ? "PUT" : "POST";
 
       // Buat payload
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         name: formData.name,
         email: formData.email,
         role_id: parseInt(formData.role_id),
       };
 
-      // Hanya tambahkan password jika diisi
-      if (formData.password && formData.password.trim() !== "") {
+      if (formData.password.trim() !== "") {
         payload.password = formData.password;
         payload.password_confirmation = formData.password_confirmation;
       }
@@ -483,13 +488,16 @@ export default function UsersPage() {
     if (result.isConfirmed) {
       try {
         const token = Cookies.get("token");
-        const res = await fetch(`http://report-api.test/api/users/${user.id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users/${user.id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
         const json = await res.json();
 
         if (res.ok) {
@@ -592,7 +600,7 @@ export default function UsersPage() {
         }
 
         const deletePromises = selectedUsers.map((item) =>
-          fetch(`http://report-api.test/api/users/${item.id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/users/${item.id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,

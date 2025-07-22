@@ -156,7 +156,7 @@ const getUserDataFromCookies = (): { user: User | null; token: string | null; } 
 
 const fetchUserProfile = async (token: string): Promise<User | null> => {
   try {
-    const response = await fetch("http://report-api.test/api/profile", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/profile`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
     if (!response.ok) return null;
@@ -184,7 +184,7 @@ export default function DashboardPage() {
     "cookie"
   );
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -211,25 +211,25 @@ export default function DashboardPage() {
         ] =
           await Promise.all([
             fetchUserProfile(token),
-            fetch("http://report-api.test/api/dashboard/stats", {
+            fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/dashboard/stats`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
             fetch(
-              `http://report-api.test/api/dashboard/report-volume?year=${selectedYear}&month=${selectedMonth}`,
+              `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/dashboard/report-volume?year=${selectedYear}&month=${selectedMonth}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
             fetch(
-              "http://report-api.test/api/dashboard/reports/stats-by-user",
+              `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/dashboard/reports/stats-by-user`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               }
             ),
             fetch(
-                "http://report-api.test/api/dashboard/health-facility?all_health_facilities=true",
+                `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/dashboard/health-facility?all_health_facilities=true`,
                 { headers: { Authorization: `Bearer ${token}` } }
             ),
             fetch(
-                "http://report-api.test/api/type-of-health-facility?per_page=All",
+                `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility?per_page=All`,
                 { headers: { Authorization: `Bearer ${token}` } }
             )
           ]);
@@ -256,7 +256,8 @@ export default function DashboardPage() {
         if (facilityTypesData.data) setHealthFacilityTypes(facilityTypesData.data);
 
 
-      } catch (err) {
+      } catch (error) {
+        console.error("Error fetching live data:", error);
         setError("Failed to fetch live data. Displaying cached information.");
       }
     } else {
@@ -542,7 +543,7 @@ export default function DashboardPage() {
                         }
                         labelLine={false}
                     >
-                        {pieChartData.map((entry, index) => (
+                        {pieChartData.map((_entry, index) => (
                         <Cell
                             key={`cell-${index}`}
                             fill={COLORS[index % COLORS.length]}
@@ -552,7 +553,7 @@ export default function DashboardPage() {
                     <Legend
                         verticalAlign="bottom"
                         height={36}
-                        formatter={(value, entry) => (
+                        formatter={(value) => (
                         <span style={{ color: "white" }}>{value}</span>
                         )}
                     />
@@ -587,7 +588,7 @@ export default function DashboardPage() {
                         />
                     </div>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={400}>
                     <PieChart>
                         <Pie
                             data={healthFacilityChartData}
@@ -602,13 +603,13 @@ export default function DashboardPage() {
                             labelLine={false}
                             label={false}
                         >
-                            {healthFacilityChartData.map((entry, index) => (
+                            {healthFacilityChartData.map((_entry, index) => (
                             <Cell key={`cell-hf-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
                          <Legend
                             verticalAlign="bottom"
-                            height={36}
+                            height={50}
                             formatter={(value) => (
                               <span className="text-white">{value}</span>
                             )}

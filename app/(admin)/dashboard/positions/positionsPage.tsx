@@ -70,7 +70,7 @@ export default function PositionsPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/position?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -143,8 +143,8 @@ export default function PositionsPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/position/${formData.id}`
-        : "http://report-api.test/api/position";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position`;
 
       // Prepare JSON payload
       const payload = {
@@ -229,7 +229,7 @@ export default function PositionsPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/position/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -323,7 +323,7 @@ export default function PositionsPage() {
         }
 
         const deletePromises = selectedPositions.map((item) =>
-          fetch(`http://report-api.test/api/position/${item.id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/position/${item.id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,

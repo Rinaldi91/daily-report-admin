@@ -74,7 +74,7 @@ export default function TypeOfHealthFacilitiesPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/type-of-health-facility?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -173,7 +173,7 @@ export default function TypeOfHealthFacilitiesPage() {
         const token = Cookies.get("token");
         const deletePromises = selectedFacilities.map((f) =>
           fetch(
-            `http://report-api.test/api/type-of-health-facility/${f.slug}`,
+            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility/${f.slug}`,
             {
               method: "DELETE",
               headers: {
@@ -244,8 +244,8 @@ export default function TypeOfHealthFacilitiesPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/type-of-health-facility/${formData.id}`
-        : "http://report-api.test/api/type-of-health-facility";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility`;
 
       // Prepare JSON payload
       const payload = {
@@ -331,7 +331,7 @@ export default function TypeOfHealthFacilitiesPage() {
         }
 
         const res = await fetch(
-          `http://report-api.test/api/type-of-health-facility/${slug}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/type-of-health-facility/${slug}`,
           {
             method: "DELETE",
             headers: {

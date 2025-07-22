@@ -61,7 +61,7 @@ export default function PermissionsPage() {
         if (search.trim()) params.append("search", search);
 
         const res = await fetch(
-          `http://report-api.test/api/permission-with-pagination?${params.toString()}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission-with-pagination?${params.toString()}`,
           {
             method: "GET",
             headers: {
@@ -178,8 +178,8 @@ export default function PermissionsPage() {
 
       const method = formData.id ? "PUT" : "POST";
       const url = formData.id
-        ? `http://report-api.test/api/permission/${formData.id}`
-        : "http://report-api.test/api/permission";
+        ? `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission/${formData.id}`
+        : `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission`;
 
       // Prepare JSON payload
       const payload = {
@@ -264,7 +264,7 @@ export default function PermissionsPage() {
           throw new Error("Token not found");
         }
 
-        const res = await fetch(`http://report-api.test/api/permission/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -360,7 +360,7 @@ export default function PermissionsPage() {
         }
 
         const deletePromises = selectedPermissions.map((item) =>
-          fetch(`http://report-api.test/api/permission/${item.id}`, {
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/permission/${item.id}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,

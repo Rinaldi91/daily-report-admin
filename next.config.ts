@@ -8,9 +8,13 @@ const nextConfig: NextConfig = {
         hostname: "placehold.co",
       },
       {
-        protocol: "http", // atau 'http' jika perlu
-        hostname: "report-api.test", // <-- Ganti dengan domain gambar Anda (mis: s3.amazonaws.com)
-        port:'',
+        protocol: "http", // Tambahkan jika gambar diakses via HTTP
+        hostname: "servicereport.fanscosa.co.id",
+        pathname: "/storage/**",
+      },
+      {
+        protocol: "https", // Tambahkan juga HTTPS jika sewaktu-waktu berpindah ke SSL
+        hostname: "servicereport.fanscosa.co.id",
         pathname: "/storage/**",
       },
     ],
