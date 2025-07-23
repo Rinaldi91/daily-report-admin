@@ -21,7 +21,6 @@ import {
   X,
   AlertTriangle,
   Printer,
-  Camera, // Tambahkan ikon baru jika diperlukan
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";

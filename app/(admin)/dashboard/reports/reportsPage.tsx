@@ -950,14 +950,11 @@ export default function ReportsClientPage() {
   };
 
   const handleCloseAndClearFilters = () => {
-    // 1. Reset all filter states to their initial values
     setFilterUser("");
     setSearchQuery("");
     setActiveDateFilter(null); // Or whatever your initial state is, e.g., "today"
     setFilterStartDate(""); // Reset start date
     setFilterEndDate(""); // Reset end date
-
-    // 2. Close the modal
     setIsExportModalOpen(false);
   };
 
@@ -1134,7 +1131,7 @@ export default function ReportsClientPage() {
                     role="combobox"
                     aria-expanded={open}
                     aria-controls="employee-listbox"
-                    className="w-full flex items-center justify-between rounded-lg border ..."
+                    className="w-full h-[38px] p-2 flex items-center justify-between rounded-lg border border-gray-700 bg-gray-800 text-white cursor-pointer"
                   >
                     <span className="truncate">
                       {filterUser
