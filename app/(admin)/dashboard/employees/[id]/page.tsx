@@ -79,7 +79,7 @@ interface EmployeeDetail {
   date_of_entry: string;
   region: string;
   is_active: number;
-  photo_url: string;
+  photo: string;
   division: Division;
   position: Position;
   reports: Report[];
@@ -388,13 +388,15 @@ export default function EmployeeDetailPage() {
         <div className="bg-gray-950 p-6 rounded-xl border border-gray-800 shadow-xl text-center">
           <Image
             src={
-              employeeInfo.photo_url ||
-              `${process.env.NEXT_PUBLIC_BASE_URL_API}/storage/images/logos/LogoArbi.png`
+              `${process.env.NEXT_PUBLIC_FILE_BASE_URL}/storage/employee_photos/${employeeInfo.photo}`
             }
             alt={employeeInfo.name}
-            width={128}
-            height={128}
-            className="rounded-full mx-auto mb-4 mt-8 object-cover"
+           width={100}
+            height={100}
+            layout="fixed"
+            objectFit="cover"
+            unoptimized
+            className="rounded-full object-cover mx-auto w-24 h-24 mb-8 mt-10"
           />
           <h2 className="text-xl font-semibold text-white">
             {employeeInfo.name}

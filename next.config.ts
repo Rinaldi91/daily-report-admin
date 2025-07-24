@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone", // Tambahkan ini untuk build di Docker
+
   images: {
     remotePatterns: [
       {
@@ -8,17 +10,18 @@ const nextConfig: NextConfig = {
         hostname: "placehold.co",
       },
       {
-        protocol: "http", // Tambahkan jika gambar diakses via HTTP
+        protocol: "http",
         hostname: "servicereport.fanscosa.co.id",
-        pathname: "/storage/**",
+        pathname: "/**",
       },
       {
-        protocol: "https", // Tambahkan juga HTTPS jika sewaktu-waktu berpindah ke SSL
+        protocol: "https",
         hostname: "servicereport.fanscosa.co.id",
-        pathname: "/storage/**",
+        pathname: "/**",
       },
     ],
   },
 };
 
 export default nextConfig;
+

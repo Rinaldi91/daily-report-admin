@@ -144,7 +144,7 @@ export default function LoginForm(): JSX.Element {
           <div className="text-center z-10 relative">
             {/* <div className="bg-white bg-opacity-20 rounded-full p-6 mb-6 mx-auto w-24 h-24 flex items-center justify-center backdrop-blur-sm">
               <Image
-                src="/images/logo_arbi.png"
+                src="/images/LOGO_ARBI.png"
                 alt="Logo PT. Anugerah Rezeki Bersama Indonesia"
                 width={64} // Anda bisa sesuaikan ukurannya
                 height={64} // Anda bisa sesuaikan ukurannya
@@ -152,7 +152,7 @@ export default function LoginForm(): JSX.Element {
             </div> */}
             <div className="flex items-center justify-center mx-auto mb-3">
               <Image
-                src="/images/logo_arbi.png"
+                src="/images/LOGO_ARBI.png"
                 alt="Logo PT. Anugerah Rezeki Bersama Indonesia"
                 width={100} // Anda bisa sesuaikan ukurannya
                 height={100} // Anda bisa sesuaikan ukurannya

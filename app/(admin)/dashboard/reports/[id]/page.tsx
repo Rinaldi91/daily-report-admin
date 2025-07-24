@@ -454,11 +454,11 @@ export default function ReportDetailPage() {
     if (url) {
       let folderPath = "";
       if (url.includes("customer_signature")) {
-        folderPath = "signatures/customer_signatures";
+        folderPath = "storage/signatures/customer_signatures";
       } else if (url.includes("employee_signature")) {
-        folderPath = "signatures/employee_signatures";
+        folderPath = "storage/signatures/employee_signatures";
       } else {
-        folderPath = "signatures";
+        folderPath = "storage/signatures";
       }
       fullImageUrl = `${baseStorageUrl}/${folderPath}/${url}`;
     }
@@ -472,6 +472,7 @@ export default function ReportDetailPage() {
               src={fullImageUrl}
               alt={`${title} signature`}
               fill
+              unoptimized
               style={{ objectFit: "contain" }}
               className="bg-white rounded-md p-1"
               onError={(e) => {
@@ -508,7 +509,7 @@ export default function ReportDetailPage() {
   }) => {
     const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
     const fullImageUrl = image.image
-      ? `${baseStorageUrl}/parts_used_images/${image.image}`
+      ? `${baseStorageUrl}/storage/parts_used_images/${image.image}`
       : null;
 
     const handleClick = () => {
@@ -775,7 +776,7 @@ export default function ReportDetailPage() {
                         const baseStorageUrl =
                           process.env.NEXT_PUBLIC_FILE_BASE_URL;
                         const reportImage = report.report_image[0];
-                        const fullImageUrl = `${baseStorageUrl}/${reportImage.image}`;
+                        const fullImageUrl = `${baseStorageUrl}/storage/${reportImage.image}`;
                         setSelectedImage({
                           url: fullImageUrl,
                           description: "Check-in Image",

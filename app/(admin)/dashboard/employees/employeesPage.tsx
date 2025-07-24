@@ -26,7 +26,7 @@ interface Employee {
   email: string;
   phone_number: string;
   is_active: number;
-  photo_url: string;
+  photo: string;
   division: Division;
   position: Position;
 }
@@ -464,11 +464,11 @@ export default function EmployeesClientPage() {
                         <Image
                           className="rounded-full object-cover"
                           src={
-                            employee.photo_url ||
-                            "${process.env.NEXT_PUBLIC_BASE_URL_API}/storage/images/logos/LogoArbi.png"
+                            `${process.env.NEXT_PUBLIC_FILE_BASE_URL}/storage/employee_photos/${employee.photo}`
                           }
                           alt={employee.name}
                           fill
+                          unoptimized
                         />
                       </div>
                       <div className="ml-4">

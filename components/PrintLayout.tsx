@@ -169,7 +169,7 @@ const PartImageBox = ({
 }) => {
   const baseStorageUrl = process.env.NEXT_PUBLIC_FILE_BASE_URL;
   const fullImageUrl = image.image
-    ? `${baseStorageUrl}/parts_used_images/${image.image}`
+    ? `${baseStorageUrl}/storage/parts_used_images/${image.image}`
     : null;
 
   const handleClick = () => {
@@ -189,6 +189,7 @@ const PartImageBox = ({
           src={fullImageUrl}
           alt={image.description || "Part image"}
           fill
+	  unoptimized
           style={{ objectFit: "cover" }} // Menggunakan 'cover' agar gambar memenuhi area
           className="transition-transform duration-300 group-hover:scale-110" // Efek zoom saat hover
           onError={(e) => {
@@ -240,11 +241,11 @@ const SignatureBox = ({
   if (url) {
     let folderPath = "";
     if (url.includes("customer_signature")) {
-      folderPath = "signatures/customer_signatures";
+      folderPath = "storage/signatures/customer_signatures";
     } else if (url.includes("employee_signature")) {
-      folderPath = "signatures/employee_signatures";
+      folderPath = "storage/signatures/employee_signatures";
     } else {
-      folderPath = "signatures";
+      folderPath = "storage/signatures";
     }
     fullImageUrl = `${baseStorageUrl}/${folderPath}/${url}`;
   }
@@ -258,6 +259,7 @@ const SignatureBox = ({
             src={fullImageUrl}
             alt={`${title}`}
             fill
+            unoptimized
             style={{ objectFit: "contain" }}
             className="bg-white rounded-md p-1"
             onError={(e) => {
