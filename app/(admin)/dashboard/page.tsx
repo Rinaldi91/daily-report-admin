@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Cookies from "js-cookie";
 import {
   BarChart,
@@ -21,7 +21,6 @@ import {
   Clock,
   FileText,
   Wrench,
-  ChevronDown,
   Building2,
   Calendar,
   CpuIcon,
@@ -146,18 +145,18 @@ const generateRandomColor = (): string => {
 };
 
 const categoryColorMap: Record<string, string> = {
-  HEMATOLOGY: "#fc0f0f",
+  "HEMATOLOGY": "#fc0f0f",
   "CLINICAL CHEMISTRY": "#F59E0B",
-  URINE: "#10B981",
-  ELEKTROLYTE: "#8B5CF6",
+  "URINE": "#10B981",
+  "ELEKTROLYTE": "#8B5CF6",
   "FLUORESCENCE IMMUNOASSAY ANALYZER": "#02d4d1",
-  COAGULATION: "#02d436",
+  "COAGULATION": "#02d436",
   "BLOOD GAS": "#b1d402",
-  POCT: "#d45a02",
+  "POCT": "#d45a02",
   "IMUNNO HEMATOLOGY": "#2202d4",
   "PLATELET STORAGE": "#5d02d4",
   "BLOOD BANK": "#d40268",
-  OTHERS: "#c902d4",
+  "OTHERS": "#c902d4",
 };
 
 // fungsi helper untuk ambil warna
@@ -222,74 +221,74 @@ const generateUniqueColors = (count: number): string[] => {
 };
 
 // --- KOMPONEN SELECT KUSTOM ---
-interface CustomSelectOption {
-  value: string;
-  label: string;
-}
+// interface CustomSelectOption {
+//   value: string;
+//   label: string;
+// }
 
-const CustomScrollSelect = ({
-  options,
-  value,
-  onChange,
-  placeholder,
-}: {
-  options: CustomSelectOption[];
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find((opt) => opt.value === value);
+// const CustomScrollSelect = ({
+//   options,
+//   value,
+//   onChange,
+//   placeholder,
+// }: {
+//   options: CustomSelectOption[];
+//   value: string;
+//   onChange: (value: string) => void;
+//   placeholder: string;
+// }) => {
+//   const [isOpen, setIsOpen] = useState(false);
+//   const selectRef = useRef<HTMLDivElement>(null);
+//   const selectedOption = options.find((opt) => opt.value === value);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        selectRef.current &&
-        !selectRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+//   useEffect(() => {
+//     const handleClickOutside = (event: MouseEvent) => {
+//       if (
+//         selectRef.current &&
+//         !selectRef.current.contains(event.target as Node)
+//       ) {
+//         setIsOpen(false);
+//       }
+//     };
+//     document.addEventListener("mousedown", handleClickOutside);
+//     return () => document.removeEventListener("mousedown", handleClickOutside);
+//   }, []);
 
-  return (
-    <div ref={selectRef} className="relative w-48">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-      >
-        <span>{selectedOption ? selectedOption.label : placeholder}</span>
-        <ChevronDown
-          className={`w-4 h-4 transition-transform ${
-            isOpen ? "transform rotate-180" : ""
-          }`}
-        />
-      </button>
+//   return (
+//     <div ref={selectRef} className="relative w-48">
+//       <button
+//         onClick={() => setIsOpen(!isOpen)}
+//         className="flex items-center justify-between w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
+//       >
+//         <span>{selectedOption ? selectedOption.label : placeholder}</span>
+//         <ChevronDown
+//           className={`w-4 h-4 transition-transform ${
+//             isOpen ? "transform rotate-180" : ""
+//           }`}
+//         />
+//       </button>
 
-      {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg">
-          <ul className="py-1" style={{ maxHeight: "9rem", overflowY: "auto" }}>
-            {options.map((option) => (
-              <li
-                key={option.value}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className="px-3 py-2 text-sm text-white hover:bg-sky-500/20 cursor-pointer"
-              >
-                {option.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+//       {isOpen && (
+//         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg">
+//           <ul className="py-1" style={{ maxHeight: "9rem", overflowY: "auto" }}>
+//             {options.map((option) => (
+//               <li
+//                 key={option.value}
+//                 onClick={() => {
+//                   onChange(option.value);
+//                   setIsOpen(false);
+//                 }}
+//                 className="px-3 py-2 text-sm text-white hover:bg-sky-500/20 cursor-pointer"
+//               >
+//                 {option.label}
+//               </li>
+//             ))}
+//           </ul>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
 
 // --- FUNGSI HELPER ---
 const getUserDataFromCookies = (): {
@@ -337,31 +336,32 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [reportVolume, setReportVolume] = useState<ReportVolumeData[]>([]);
   const [userStats, setUserStats] = useState<UserReportStats[]>([]);
-  const [healthFacilities, setHealthFacilities] = useState<HealthFacility[]>(
+  const [, setHealthFacilities] = useState<HealthFacility[]>(
     []
   );
-  const [healthFacilityTypes, setHealthFacilityTypes] = useState<
+  const [, setHealthFacilityTypes] = useState<
     HealthFacilityType[]
   >([]);
   // const [selectedFacilityType, setSelectedFacilityType] = useState<string>("");
-  const [selectedFacilityType, setSelectedFacilityType] = useState<
-    { value: string | number; label: string }[]
-  >([]);
+  // const [selectedFacilityType] = useState<
+  //   { value: string | number; label: string }[]
+  // >([]);
 
-  const [selectedCities, setSelectedCities] = useState<
-    { value: string | number; label: string }[]
-  >([]);
+  // const [selectedCities] = useState<
+  //   { value: string | number; label: string }[]
+  // >([]);
 
-  const cityOptions = useMemo(() => {
-    const uniqueCities = Array.from(
-      new Set(healthFacilities.map((f) => f.city || "")) // fallback string kosong
-    ).filter((c) => c !== ""); // buang yang kosong/null
-    const options = uniqueCities.map((city) => ({
-      value: city,
-      label: city,
-    }));
-    return [{ value: "ALL", label: "All Cities" }, ...options];
-  }, [healthFacilities]);
+
+  // const cityOptions = useMemo(() => {
+  //   const uniqueCities = Array.from(
+  //     new Set(healthFacilities.map((f) => f.city || "")) // fallback string kosong
+  //   ).filter((c) => c !== ""); // buang yang kosong/null
+  //   const options = uniqueCities.map((city) => ({
+  //     value: city,
+  //     label: city,
+  //   }));
+  //   return [{ value: "ALL", label: "All Cities" }, ...options];
+  // }, [healthFacilities]);
 
   const [dataSource, setDataSource] = useState<"cookie" | "api" | "fallback">(
     "cookie"
@@ -373,7 +373,7 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   const [population, setPopulation] = useState<PopulationItem[]>([]);
-  const colors = generateUniqueColors(population.length);
+  // const colors = generateUniqueColors(population.length);
 
   const [selectedCategories, setSelectedCategories] = useState<
     { value: string | number; label: string }[]
@@ -401,14 +401,14 @@ export default function DashboardPage() {
 
   // const filteredPopulation = population;
 
-  const filteredPopulation = useMemo(() => {
-    if (selectedCategories.length === 0) return population;
+  // const filteredPopulation = useMemo(() => {
+  //   if (selectedCategories.length === 0) return population;
 
-    const selectedValues = selectedCategories.map((s) => Number(s.value));
-    return population.filter((item) =>
-      selectedValues.includes(item.category_id)
-    );
-  }, [population, selectedCategories]);
+  //   const selectedValues = selectedCategories.map((s) => Number(s.value));
+  //   return population.filter((item) =>
+  //     selectedValues.includes(item.category_id)
+  //   );
+  // }, [population, selectedCategories]);
 
   const [brands, setBrands] = useState<BrandItem[]>([]);
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -420,12 +420,12 @@ export default function DashboardPage() {
     { value: string | number; label: string }[]
   >([]);
 
-  const filteredColors = useMemo(
-    () => generateUniqueColors(filteredPopulation.length),
-    [filteredPopulation.length]
-  );
+  // const filteredColors = useMemo(
+  //   () => generateUniqueColors(filteredPopulation.length),
+  //   [filteredPopulation.length]
+  // );
 
-  const [deviceNotifications, setDeviceNotifications] = useState<
+  const [, setDeviceNotifications] = useState<
     DeviceNotification[]
   >([]);
 
@@ -703,16 +703,16 @@ export default function DashboardPage() {
     []
   );
 
-  const facilityTypeOptions = useMemo(() => {
-    const defaultOption = { value: "", label: "All Types" };
-    const otherOptions = healthFacilityTypes.map(
-      (type: HealthFacilityType) => ({
-        value: String(type.id),
-        label: type.name,
-      })
-    );
-    return [defaultOption, ...otherOptions];
-  }, [healthFacilityTypes]);
+  // const facilityTypeOptions = useMemo(() => {
+  //   const defaultOption = { value: "", label: "All Types" };
+  //   const otherOptions = healthFacilityTypes.map(
+  //     (type: HealthFacilityType) => ({
+  //       value: String(type.id),
+  //       label: type.name,
+  //     })
+  //   );
+  //   return [defaultOption, ...otherOptions];
+  // }, [healthFacilityTypes]);
 
   // Transform user stats data for pie chart
   const pieChartData = useMemo(() => {
@@ -722,46 +722,46 @@ export default function DashboardPage() {
     }));
   }, [userStats]);
 
-  const healthFacilityChartData = useMemo(() => {
-    let filteredFacilities = healthFacilities;
+  // const healthFacilityChartData = useMemo(() => {
+  //   let filteredFacilities = healthFacilities;
 
-    // Filter berdasarkan Type
-    if (
-      selectedFacilityType.length > 0 &&
-      !selectedFacilityType.some((opt) => opt.value === "")
-    ) {
-      const selectedIds = selectedFacilityType.map((opt) => Number(opt.value));
-      filteredFacilities = filteredFacilities.filter((f) =>
-        selectedIds.includes(f.type_of_health_facility_id)
-      );
-    }
+  //   // Filter berdasarkan Type
+  //   if (
+  //     selectedFacilityType.length > 0 &&
+  //     !selectedFacilityType.some((opt) => opt.value === "")
+  //   ) {
+  //     const selectedIds = selectedFacilityType.map((opt) => Number(opt.value));
+  //     filteredFacilities = filteredFacilities.filter((f) =>
+  //       selectedIds.includes(f.type_of_health_facility_id)
+  //     );
+  //   }
 
-    // Filter berdasarkan City
-    if (
-      selectedCities.length > 0 &&
-      !selectedCities.some((opt) => opt.value === "ALL")
-    ) {
-      const selectedCityNames = selectedCities.map((opt) => String(opt.value));
-      filteredFacilities = filteredFacilities.filter((f) =>
-        selectedCityNames.includes(f.city)
-      );
-    }
-    // Hitung jumlah per kota
-    const countByCity = filteredFacilities.reduce((acc, facility) => {
-      acc[facility.city] = (acc[facility.city] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  //   // Filter berdasarkan City
+  //   if (
+  //     selectedCities.length > 0 &&
+  //     !selectedCities.some((opt) => opt.value === "ALL")
+  //   ) {
+  //     const selectedCityNames = selectedCities.map((opt) => String(opt.value));
+  //     filteredFacilities = filteredFacilities.filter((f) =>
+  //       selectedCityNames.includes(f.city)
+  //     );
+  //   }
+  //   // Hitung jumlah per kota
+  //   const countByCity = filteredFacilities.reduce((acc, facility) => {
+  //     acc[facility.city] = (acc[facility.city] || 0) + 1;
+  //     return acc;
+  //   }, {} as Record<string, number>);
 
-    return Object.entries(countByCity).map(([cityName, count]) => ({
-      name: cityName,
-      value: count,
-    }));
-  }, [healthFacilities, selectedFacilityType, selectedCities]);
+  //   return Object.entries(countByCity).map(([cityName, count]) => ({
+  //     name: cityName,
+  //     value: count,
+  //   }));
+  // }, [healthFacilities, selectedFacilityType, selectedCities]);
 
-  const totalHealthFacilities = useMemo(
-    () => healthFacilityChartData.reduce((sum, item) => sum + item.value, 0),
-    [healthFacilityChartData]
-  );
+  // const totalHealthFacilities = useMemo(
+  //   () => healthFacilityChartData.reduce((sum, item) => sum + item.value, 0),
+  //   [healthFacilityChartData]
+  // );
 
   const filteredPieChartData = useMemo(() => {
     if (selectedUsers.length === 0) return pieChartData;
@@ -774,9 +774,9 @@ export default function DashboardPage() {
     return generateUniqueColors(pieChartData.length);
   }, [pieChartData.length]);
 
-  const healthFacilityColors = useMemo(() => {
-    return generateUniqueColors(healthFacilityChartData.length);
-  }, [healthFacilityChartData.length]);
+  // const healthFacilityColors = useMemo(() => {
+  //   return generateUniqueColors(healthFacilityChartData.length);
+  // }, [healthFacilityChartData.length]);
 
   const formatDateTimeID = (dateString: string) => {
     if (!dateString) return "-";

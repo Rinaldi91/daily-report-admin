@@ -22,7 +22,6 @@ import {
   Filter,
   BarChart2,
   ListCheck,
-  FileText,
   FileSpreadsheet,
 } from "lucide-react";
 import Image from "next/image";
@@ -144,14 +143,10 @@ interface ReportPagination {
   links: ReportPaginationLinks;
 }
 
-const COLORS = [
-  "#34D399",
-  "#60A5FA",
-  "#FBBF24",
-  "#F87171",
-  "#A78BFA",
-  "#F472B6",
-];
+interface EmployeeInfo {
+  name: string;
+  total_medical_devices_serviced_overall: number;
+}
 
 const DetailItem = ({
   icon: Icon,
@@ -282,122 +277,7 @@ export default function EmployeeDetailPage() {
     [id]
   );
 
-  // const exportToExcel = (employeeInfo: any, reports: any[]) => {
-  //   if (!employeeInfo) return;
-
-  //   // --- Hitung summary ---
-  //   const totalReports = reports.length;
-  //   const activeDays = new Set(reports.map((r) => r.completed_at.split(" ")[0]))
-  //     .size;
-  //   const avgDay = totalReports / (activeDays || 1);
-
-  //   // Hitung peak
-  //   const dateCount: Record<string, number> = {};
-  //   reports.forEach((r) => {
-  //     const date = r.completed_at.split(" ")[0]; // YYYY-MM-DD
-  //     dateCount[date] = (dateCount[date] || 0) + 1;
-  //   });
-
-  //   let peakCount = 0;
-  //   let peakDate = "";
-
-  //   Object.entries(dateCount).forEach(([date, count]) => {
-  //     if (
-  //       count > peakCount ||
-  //       (count === peakCount && new Date(date) > new Date(peakDate))
-  //     ) {
-  //       peakCount = count;
-  //       peakDate = date;
-  //     }
-  //   });
-
-  //   // Format tanggal Indonesia
-  //   const formatDateIndo = (dateStr: string) => {
-  //     if (!dateStr) return "";
-  //     return new Intl.DateTimeFormat("id-ID", {
-  //       weekday: "long",
-  //       day: "numeric",
-  //       month: "long",
-  //       year: "numeric",
-  //     }).format(new Date(dateStr));
-  //   };
-
-  //   const peak = `${peakCount} laporan pada ${formatDateIndo(peakDate)}`;
-
-  //   // --- Header Row ---
-  //   const headerRow = [
-  //     "Technician",
-  //     "Total Reports",
-  //     "Total Days",
-  //     "Avg/Day",
-  //     "Peak",
-  //     "Total Medical Devices Serviced (All Reports)",
-  //   ];
-
-  //   const headerValues = [
-  //     employeeInfo.name,
-  //     totalReports,
-  //     activeDays,
-  //     avgDay.toFixed(1),
-  //     peak,
-  //     employeeInfo.total_medical_devices_serviced_overall,
-  //   ];
-
-  //   // --- Report Rows ---
-  //   const reportsSheet = reports.flatMap((r, idx) =>
-  //     r.report_work_item.length > 0
-  //       ? r.report_work_item.map((wi: any, wiIdx: number) => [
-  //           `${idx + 1}.${wiIdx + 1}`,
-  //           r.report_number,
-  //           r.health_facility?.name || "",
-  //           employeeInfo.name,
-  //           formatDateIndo(r.completed_at), // ✅ tanggal Indonesia
-  //           r.is_status,
-  //           `${wi.medical_device?.brand || ""} ${
-  //             wi.medical_device?.model || ""
-  //           } (${wi.medical_device?.serial_number || ""})`,
-  //         ])
-  //       : [
-  //           [
-  //             idx + 1,
-  //             r.report_number,
-  //             r.health_facility?.name || "",
-  //             employeeInfo.name,
-  //             formatDateIndo(r.completed_at), // ✅ tanggal Indonesia
-  //             r.is_status,
-  //             "-",
-  //           ],
-  //         ]
-  //   );
-
-  //   const reportHeader = [
-  //     "No",
-  //     "Report Number",
-  //     "Health Facility",
-  //     "User",
-  //     "Date",
-  //     "Status",
-  //     "Device Serviced",
-  //   ];
-
-  //   // Gabungkan semua
-  //   const worksheetData = [
-  //     headerRow,
-  //     headerValues,
-  //     [],
-  //     reportHeader,
-  //     ...reportsSheet,
-  //   ];
-
-  //   // Buat workbook
-  //   const wb = XLSX.utils.book_new();
-  //   const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-
-  //   XLSX.utils.book_append_sheet(wb, ws, "Employee Reports");
-  //   XLSX.writeFile(wb, `${employeeInfo.name}_Reports.xlsx`);
-  // };
-
-  const exportToExcel = (employeeInfo: any, reports: any[]) => {
+  const exportToExcel = (employeeInfo: EmployeeInfo, reports: Report[]) => {
     if (!employeeInfo) return;
 
     // --- Hitung summary ---
@@ -475,17 +355,19 @@ export default function EmployeeDetailPage() {
         ];
 
         // Untuk item selanjutnya, hanya tampilkan device
-        const additionalRows = r.report_work_item.slice(1).map((wi: any) => [
-          "", // No kosong
-          "", // Report Number kosong
-          "", // Health Facility kosong
-          "", // User kosong
-          "", // Date kosong
-          "", // Status kosong
-          `${wi.medical_device?.brand || ""} ${
-            wi.medical_device?.model || ""
-          } (${wi.medical_device?.serial_number || ""})`,
-        ]);
+        const additionalRows = r.report_work_item
+          .slice(1)
+          .map((wi: ReportWorkItem) => [
+            "", // No kosong
+            "", // Report Number kosong
+            "", // Health Facility kosong
+            "", // User kosong
+            "", // Date kosong
+            "", // Status kosong
+            `${wi.medical_device?.brand || ""} ${
+              wi.medical_device?.model || ""
+            } (${wi.medical_device?.serial_number || ""})`,
+          ]);
 
         return [firstRow, ...additionalRows];
       } else {
@@ -527,28 +409,27 @@ export default function EmployeeDetailPage() {
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
 
     // Optional: Styling untuk membuat lebih rapi
-    // Merge cells untuk kolom yang kosong agar lebih terlihat rapi
-    ws["!merges"] = []; // Bisa ditambahkan merge cells jika diperlukan
+    ws["!merges"] = [];
 
     XLSX.utils.book_append_sheet(wb, ws, "Employee Reports");
     XLSX.writeFile(wb, `${employeeInfo.name}_Reports.xlsx`);
   };
 
-  // Separate useEffect for initial load and when dependencies change
+  // Fix 1: Add missing dependencies to useEffect
   useEffect(() => {
     fetchData(1, startDate, endDate, selectedHealthFacilities);
-  }, [startDate, endDate, selectedHealthFacilities, fetchData]);
+  }, [id, startDate, endDate, selectedHealthFacilities, fetchData]);
 
   // Separate useEffect for pagination changes
   useEffect(() => {
     if (currentPage > 1) {
       fetchData(currentPage, startDate, endDate, selectedHealthFacilities);
     }
-  }, [currentPage]);
+  }, [currentPage, startDate, endDate, selectedHealthFacilities, fetchData]);
 
   // Reset chart expansion when data changes
   useEffect(() => {
-    setVisibleCount;
+    setVisibleCount(8); // reset ke 8 (sesuai state awal)
     setShowAllDates(false);
   }, [fullReports]);
 
@@ -577,6 +458,18 @@ export default function EmployeeDetailPage() {
     };
     fetchHealthFacilities();
   }, []);
+
+  // Fix for default date filter - separate useEffect to avoid dependency conflicts
+  useEffect(() => {
+    // set default filter ke bulan berjalan saat pertama kali load
+    const today = new Date();
+    const start = format(startOfMonth(today), "yyyy-MM-dd");
+    const end = format(endOfMonth(today), "yyyy-MM-dd");
+
+    setStartDate(start);
+    setEndDate(end);
+    setActiveDateFilter("month");
+  }, []); // Empty dependency array since this should only run once on mount
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= (reportPagination?.meta.last_page || 1)) {
@@ -646,17 +539,6 @@ export default function EmployeeDetailPage() {
     setSelectedHealthFacilities(selectedOptions);
     setCurrentPage(1); // Reset to page 1 when filter changes
   };
-
-  useEffect(() => {
-    // set default filter ke bulan berjalan saat pertama kali load
-    const today = new Date();
-    const start = format(startOfMonth(today), "yyyy-MM-dd");
-    const end = format(endOfMonth(today), "yyyy-MM-dd");
-
-    setStartDate(start);
-    setEndDate(end);
-    setDateFilter("month");
-  }, []);
 
   // MOVED renderReportsChart to use passed props instead of hooks
   const renderReportsChart = (reports: Report[]) => {
@@ -843,8 +725,8 @@ export default function EmployeeDetailPage() {
                         fontSize: "14px",
                         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                       }}
-                      formatter={(value: any) => [
-                        <span className="font-medium">{value} reports</span>,
+                      formatter={(value: number | string) => [
+                        <span key="reports-count" className="font-medium">{value} reports</span>,
                         "Total",
                       ]}
                       labelFormatter={(label: string) => (
@@ -879,9 +761,9 @@ export default function EmployeeDetailPage() {
                                     ):
                                   </p>
                                   <div className="space-y-1 max-h-32 overflow-y-auto">
-                                    {healthFacilities.map((facility, index) => (
+                                    {healthFacilities.map((facility, idx) => (
                                       <div
-                                        key={index}
+                                        key={`facility-${idx}`}
                                         className="flex items-start gap-2"
                                       >
                                         <span className="inline-block w-1.5 h-1.5 bg-blue-400 rounded-full mt-1.5 flex-shrink-0"></span>
@@ -1302,9 +1184,9 @@ export default function EmployeeDetailPage() {
                 Selected Health Facilities ({selectedHealthFacilities.length}):
               </p>
               <div className="flex flex-wrap gap-2">
-                {selectedHealthFacilities.map((hf) => (
+                {selectedHealthFacilities.map((hf, index) => (
                   <span
-                    key={hf.value}
+                    key={`selected-hf-${index}-${hf.value}`}
                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-600 text-white"
                   >
                     {hf.label}
@@ -1454,15 +1336,14 @@ export default function EmployeeDetailPage() {
                           {report.report_work_item?.length > 0 ? (
                             <ul className="space-y-1">
                               {report.report_work_item.map(
-                                (wi: any, i: number) => (
+                                (wi: ReportWorkItem) => (
                                   <li
-                                    key={i}
+                                    key={wi.id}
                                     className="text-sm whitespace-nowrap"
                                   >
                                     {wi.medical_device?.brand} -{" "}
                                     {wi.medical_device?.model}
                                     <span className="text-gray-400">
-                                      {" "}
                                       (SN:{" "}
                                       {wi.medical_device?.serial_number || "-"})
                                     </span>
@@ -1513,14 +1394,14 @@ export default function EmployeeDetailPage() {
                     {getPaginationNumbers().map((page, index) =>
                       page === "..." ? (
                         <span
-                          key={index}
+                          key={`ellipsis-${index}`}
                           className="px-3 py-2 text-sm text-gray-500"
                         >
                           ...
                         </span>
                       ) : (
                         <button
-                          key={index}
+                          key={`page-${page}`}
                           onClick={() => handlePageChange(page as number)}
                           className={`px-3 py-2 text-sm border rounded-md transition-colors cursor-pointer ${
                             reports_pagination.meta.current_page === page

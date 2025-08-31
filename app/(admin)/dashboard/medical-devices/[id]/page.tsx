@@ -32,6 +32,14 @@ interface MedicalDeviceCategory {
   name: string;
 }
 
+interface Pagination {
+  total: number;
+  current_page: number;
+  last_page: number;
+  prev_page_url: string | null;
+  next_page_url: string | null;
+}
+
 interface MedicalDevice {
   id: number;
   brand: string;
@@ -102,7 +110,9 @@ interface DeviceHistoryRecord {
 
 // --- KOMPONEN UTAMA ---
 export default function MedicalDeviceDetailPage() {
-  const [pagination, setPagination] = useState<any>(null);
+  // const [pagination, setPagination] = useState<any>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const router = useRouter();
@@ -137,7 +147,7 @@ export default function MedicalDeviceDetailPage() {
       : true
   );
 
-  const filteredCount = filteredHistory.length;
+  // const filteredCount = filteredHistory.length;
 
   interface ToggleCardFn {
     (cardId: number): void;

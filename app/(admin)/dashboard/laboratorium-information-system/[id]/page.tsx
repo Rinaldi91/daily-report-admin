@@ -30,6 +30,15 @@ interface MedicalDeviceCategory {
   name: string;
 }
 
+interface Pagination {
+  total_service_count: number;
+  total: number;
+  prev_page_url: string | null;
+  next_page_url: string | null;
+  current_page: number;
+  last_page: number;
+}
+
 interface MedicalDevice {
   id: number;
   brand: string;
@@ -96,8 +105,8 @@ interface DeviceHistoryRecord {
 
 // --- KOMPONEN UTAMA ---
 export default function LisDetailPage() {
-  const [pagination, setPagination] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
 
   const router = useRouter();
   const { id } = useParams();
@@ -487,7 +496,7 @@ export default function LisDetailPage() {
                 <div>
                   <p className="text-sm text-gray-400">Total Service Records</p>
                   <p className="text-lg font-bold text-white leading-tight">
-                    {filteredCount} / {pagination.total_service_count}
+                    {filteredCount} / {pagination?.total_service_count}
                   </p>
                   {/* <p className="text-xs text-gray-400">(Filtered / All)</p> */}
                 </div>

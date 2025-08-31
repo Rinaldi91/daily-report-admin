@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
 import "react-quill/dist/quill.snow.css";
-import dynamic from "next/dynamic";
 import { Editor } from "@tinymce/tinymce-react";
 
 import {
@@ -48,7 +47,7 @@ interface FormInformation {
 export default function InformationPage() {
   const [information, setInformation] = useState<Information[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -72,7 +71,7 @@ export default function InformationPage() {
   const [selectedItem, setSelectedItem] = useState<Information | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+  // const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
   const fetchInformation = useCallback(
     async (page: number = 1, search: string = "") => {
@@ -251,6 +250,7 @@ export default function InformationPage() {
         Swal.fire("Error", errorData.message || "Failed to save", "error");
       }
     } catch (error) {
+      console.error("Submit error:", error);
       Swal.fire("Error", "Network error or server unavailable", "error");
     }
   };
@@ -310,7 +310,7 @@ export default function InformationPage() {
             color: "#F9FAFB",
           });
         }
-      } catch (error) {
+      } catch (_error) {
         Swal.fire({
           title: "Error",
           text: "Failed to delete information",

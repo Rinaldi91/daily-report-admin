@@ -12,6 +12,8 @@ import {
   MonitorSmartphone,
 } from "lucide-react";
 import ReactDOMServer from "react-dom/server";
+import { useMap } from "react-leaflet";
+
 
 interface MedicalDevice {
   id: number;
@@ -33,6 +35,20 @@ interface Location {
   total_devices: number;
   medical_devices: MedicalDevice[];
 }
+
+interface FacilityApiResponse {
+  id: number;
+  name: string;
+  city: string;
+  type: string;
+  lat: string;
+  lng: string;
+  address?: string;
+  total_devices: number;
+  medical_devices: MedicalDevice[];
+}
+
+
 
 const INITIAL_CENTER: [number, number] = [-2.5, 118];
 const INITIAL_ZOOM = 5;
@@ -161,7 +177,7 @@ const FlyAndReset = ({
   locations: Location[];
   L: typeof Leaflet;
 }) => {
-  const { useMap } = require("react-leaflet");
+  // const { useMap } = require("react-leaflet");
   const map = useMap();
 
   useEffect(() => {
@@ -191,19 +207,22 @@ const PopupHandler = ({
   focusLocations: Location[];
   L: typeof Leaflet;
 }) => {
-  const { useMap } = require("react-leaflet");
+  // const { useMap } = require("react-leaflet");
   const map = useMap();
-  const popupRefs = useRef<Map<number, any>>(new Map());
+  // const popupRefs = useRef<Map<number, any>>(new Map());
+  const popupRefs = useRef<Map<number, Leaflet.Popup>>(new Map());
+
 
   useEffect(() => {
+    const currentRefs = popupRefs.current;
     if (!map || !L) return;
 
     // Clear semua popup yang ada
     map.closePopup();
-    popupRefs.current.forEach((popup) => {
+    currentRefs.forEach((popup) => {
       map.removeLayer(popup);
     });
-    popupRefs.current.clear();
+    currentRefs.clear();
 
     // Jika tidak ada selection, tidak perlu buka popup
     if (focusLocations.length === 0) {
@@ -222,7 +241,7 @@ const PopupHandler = ({
         .setContent(popupHtml)
         .openOn(map);
 
-      popupRefs.current.set(location.id, popup);
+      currentRefs.set(location.id, popup);
     } else {
       // Jika lebih dari satu lokasi, buka popup untuk semua lokasi yang dipilih
       focusLocations.forEach((location, index) => {
@@ -242,18 +261,18 @@ const PopupHandler = ({
           popup.openOn(map);
         }, index * 100);
 
-        popupRefs.current.set(location.id, popup);
+        currentRefs.set(location.id, popup);
       });
     }
 
     // Cleanup function
     return () => {
-      popupRefs.current.forEach((popup) => {
+      currentRefs.forEach((popup) => {
         if (map.hasLayer(popup)) {
           map.removeLayer(popup);
         }
       });
-      popupRefs.current.clear();
+      currentRefs.clear();
     };
   }, [focusLocations, map, L]);
 
@@ -411,7 +430,7 @@ const IndonesiaMap: React.FC = () => {
       }
 
       const transformed: Location[] = json.data
-        .filter((f: any) => {
+        .filter((f: FacilityApiResponse) => {
           const hasValidCoords =
             f.lat &&
             f.lng &&
@@ -478,32 +497,32 @@ const IndonesiaMap: React.FC = () => {
     selected.length > 0 ? focusLocations : filteredByCity;
 
   // Auto zoom ketika memilih kota
-  const FlyToCities = ({
-    locations,
-    L,
-  }: {
-    locations: Location[];
-    L: typeof Leaflet;
-  }) => {
-    const { useMap } = require("react-leaflet");
-    const map = useMap();
+  // const FlyToCities = ({
+  //   locations,
+  //   L,
+  // }: {
+  //   locations: Location[];
+  //   L: typeof Leaflet;
+  // }) => {
+  //   const { useMap } = require("react-leaflet");
+  //   const map = useMap();
 
-    useEffect(() => {
-      if (locations.length > 0) {
-        if (locations.length === 1) {
-          const loc = locations[0];
-          map.flyTo([loc.lat, loc.lng], 11); // zoom in lebih dekat
-        } else {
-          const bounds = L.latLngBounds(
-            locations.map((l) => [l.lat, l.lng] as [number, number])
-          );
-          map.fitBounds(bounds, { padding: [50, 50] });
-        }
-      }
-    }, [locations, map, L]);
+  //   useEffect(() => {
+  //     if (locations.length > 0) {
+  //       if (locations.length === 1) {
+  //         const loc = locations[0];
+  //         map.flyTo([loc.lat, loc.lng], 11); // zoom in lebih dekat
+  //       } else {
+  //         const bounds = L.latLngBounds(
+  //           locations.map((l) => [l.lat, l.lng] as [number, number])
+  //         );
+  //         map.fitBounds(bounds, { padding: [50, 50] });
+  //       }
+  //     }
+  //   }, [locations, map, L]);
 
-    return null;
-  };
+  //   return null;
+  // };
 
   // Show loading while components are loading
   if (!isClient || !leafletComponents || !L) {

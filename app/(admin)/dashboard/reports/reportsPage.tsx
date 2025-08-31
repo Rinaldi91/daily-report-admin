@@ -35,7 +35,6 @@ import {
 import { useMemo } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { ChevronsUpDown, Check } from "lucide-react";
-import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface FullReport {
@@ -192,13 +191,13 @@ export default function ReportsClientPage() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [healthFacilities, setHealthFacilities] = useState<
-    { label: string; value: string }[]
-  >([]);
+  const [, setHealthFacilities] = useState<{ label: string; value: string }[]>(
+    []
+  );
   // const [selectedFacilities, setSelectedFacilities] = useState<
   //   { label: string; value: string }[]
   // >([]);
-  const [selectedFacilities, setSelectedFacilities] = useState<Option[]>([]);
+  const [selectedFacilities] = useState<Option[]>([]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -290,6 +289,17 @@ export default function ReportsClientPage() {
     },
     [] // Removed perPage from dependencies as it's not needed
   );
+
+  // const handleFilterChange = useCallback(
+  //   (page: number, search: string, sDate: string, eDate: string) => {
+  //     updateUrlParams(page, search, sDate, eDate);
+  //   },
+  //   [updateUrlParams]
+  // );
+
+  // useEffect(() => {
+  //   fetchReports();
+  // }, []);
 
   const handleFilterToday = () => {
     const today = format(new Date(), "yyyy-MM-dd");

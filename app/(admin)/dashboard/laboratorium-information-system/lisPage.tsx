@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import Cookies from "js-cookie";
 import {
@@ -12,7 +12,6 @@ import {
   Save,
   PlusIcon,
   X,
-  MonitorSmartphone,
   Pencil,
   PlusCircle,
   Eye,
@@ -22,31 +21,30 @@ import {
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
-import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
 
-interface Permission {
-  id: number;
-  name: string;
-  slug: string;
-}
+// interface Permission {
+//   id: number;
+//   name: string;
+//   slug: string;
+// }
 
-interface Role {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  permissions: Permission[];
-}
+// interface Role {
+//   id: number;
+//   name: string;
+//   slug: string;
+//   description: string;
+//   permissions: Permission[];
+// }
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  email_verified_at: string;
-  created_at: string;
-  updated_at: string;
-  role: Role;
-}
+// interface User {
+//   id: number;
+//   name: string;
+//   email: string;
+//   email_verified_at: string;
+//   created_at: string;
+//   updated_at: string;
+//   role: Role;
+// }
 
 interface MedicalDeviceCategory {
   id: number;
@@ -109,7 +107,7 @@ interface ModelItem {
 }
 
 export default function LisPage() {
-  const [devices, setDevices] = useState<MedicalDevice[]>([]);
+  // const [devices, setDevices] = useState<MedicalDevice[]>([]);
   const router = useRouter();
   const [medicalDevices, setMedicalDevices] = useState<MedicalDevice[]>([]);
   const [medicalDeviceCategories, setMedicalDeviceCategories] = useState<
@@ -127,7 +125,7 @@ export default function LisPage() {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const pathname = usePathname();
+  // const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // Multi-delete states
@@ -395,14 +393,17 @@ export default function LisPage() {
   // Handle filter changes
   const handleFilterChange = useCallback(() => {
     fetchMedicalDevices(1, searchTerm);
-  }, [
-    selectedCategories,
-    selectedBrands,
-    selectedModels,
-    searchTerm,
-    filters,
-    fetchMedicalDevices,
-  ]);
+  }, [searchTerm, fetchMedicalDevices]);
+  // const handleFilterChange = useCallback(() => {
+  //   fetchMedicalDevices(1, searchTerm);
+  // }, [
+  //   selectedCategories,
+  //   selectedBrands,
+  //   selectedModels,
+  //   searchTerm,
+  //   filters,
+  //   fetchMedicalDevices,
+  // ]);
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -429,26 +430,26 @@ export default function LisPage() {
     filters.model;
 
   // Generate filter options based on available data
-  const categoryOptions = medicalDeviceCategories
-    .filter((cat) => cat.id !== 31) // Exclude category 31
-    .map((cat) => ({
-      value: cat.name, // Use name instead of slug
-      label: cat.name,
-    }));
+  // const categoryOptions = medicalDeviceCategories
+  //   .filter((cat) => cat.id !== 31) // Exclude category 31
+  //   .map((cat) => ({
+  //     value: cat.name, // Use name instead of slug
+  //     label: cat.name,
+  //   }));
 
-  const brandOptions = brands
-    .filter((b) => !["VANSLITE", "VANSLAB"].includes(b.brand.toUpperCase()))
-    .map((b) => ({
-      value: b.brand.toLowerCase(), // Lowercase to match API
-      label: b.brand,
-    }));
+  // const brandOptions = brands
+  //   .filter((b) => !["VANSLITE", "VANSLAB"].includes(b.brand.toUpperCase()))
+  //   .map((b) => ({
+  //     value: b.brand.toLowerCase(), // Lowercase to match API
+  //     label: b.brand,
+  //   }));
 
-  const modelOptions = models
-    .filter((m) => m.id !== 31) // Filter out models from excluded category
-    .map((m) => ({
-      value: m.model.toLowerCase(), // Lowercase to match API
-      label: m.model,
-    }));
+  // const modelOptions = models
+  //   .filter((m) => m.id !== 31) // Filter out models from excluded category
+  //   .map((m) => ({
+  //     value: m.model.toLowerCase(), // Lowercase to match API
+  //     label: m.model,
+  //   }));
 
   // Initialize filters from URL parameters
   useEffect(() => {
@@ -877,6 +878,17 @@ export default function LisPage() {
   }, [searchTerm, handleFilterChange]);
 
   // Filter effect
+  // useEffect(() => {
+  //   if (
+  //     medicalDeviceCategories.length > 0 &&
+  //     brands.length > 0 &&
+  //     models.length > 0
+  //   ) {
+  //     handleFilterChange();
+  //   }
+  // }, [selectedCategories, selectedBrands, selectedModels, filters]);
+
+  // Filter effect
   useEffect(() => {
     if (
       medicalDeviceCategories.length > 0 &&
@@ -885,7 +897,7 @@ export default function LisPage() {
     ) {
       handleFilterChange();
     }
-  }, [selectedCategories, selectedBrands, selectedModels, filters]);
+  }, [medicalDeviceCategories, brands, models, handleFilterChange]);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -987,15 +999,15 @@ export default function LisPage() {
         <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
           {/* Search Input */}
           <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search by serial number.."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-gray-800 text-white"
-              />
-            </div>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search by serial number.."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-gray-800 text-white"
+            />
+          </div>
 
           {/* Filter Controls */}
           {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1094,7 +1106,7 @@ export default function LisPage() {
 
                 {searchTerm && (
                   <span className="bg-yellow-600/90 text-white px-3 py-1.5 rounded-full text-xs shadow-sm">
-                    Search: "{searchTerm}"
+                    Search: &quot;{searchTerm}&quot;
                   </span>
                 )}
               </div>

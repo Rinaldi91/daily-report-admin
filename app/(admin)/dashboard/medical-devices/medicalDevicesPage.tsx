@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import Cookies from "js-cookie";
 import {
@@ -23,29 +23,29 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
 
-interface Permission {
-  id: number;
-  name: string;
-  slug: string;
-}
+// interface Permission {
+//   id: number;
+//   name: string;
+//   slug: string;
+// }
 
-interface Role {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  permissions: Permission[];
-}
+// interface Role {
+//   id: number;
+//   name: string;
+//   slug: string;
+//   description: string;
+//   permissions: Permission[];
+// }
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  email_verified_at: string;
-  created_at: string;
-  updated_at: string;
-  role: Role;
-}
+// interface User {
+//   id: number;
+//   name: string;
+//   email: string;
+//   email_verified_at: string;
+//   created_at: string;
+//   updated_at: string;
+//   role: Role;
+// }
 
 interface MedicalDeviceCategory {
   id: number;
@@ -113,7 +113,7 @@ interface ModelItem {
 }
 
 export default function MedicalDevicesPage() {
-  const [devices, setDevices] = useState<MedicalDevice[]>([]);
+  // const [devices, setDevices] = useState<MedicalDevice[]>([]);
   const router = useRouter();
   const [medicalDevices, setMedicalDevices] = useState<MedicalDevice[]>([]);
   const [medicalDeviceCategories, setMedicalDeviceCategories] = useState<
@@ -131,7 +131,7 @@ export default function MedicalDevicesPage() {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const pathname = usePathname();
+  // const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // Multi-delete states
@@ -403,14 +403,18 @@ export default function MedicalDevicesPage() {
   // Handle filter changes
   const handleFilterChange = useCallback(() => {
     fetchMedicalDevices(1, searchTerm);
-  }, [
-    selectedCategories,
-    selectedBrands,
-    selectedModels,
-    searchTerm,
-    filters,
-    fetchMedicalDevices,
-  ]);
+  }, [searchTerm, fetchMedicalDevices]);
+
+  // const handleFilterChange = useCallback(() => {
+  //   fetchMedicalDevices(1, searchTerm);
+  // }, [
+  //   selectedCategories,
+  //   selectedBrands,
+  //   selectedModels,
+  //   searchTerm,
+  //   filters,
+  //   fetchMedicalDevices,
+  // ]);
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -885,6 +889,15 @@ export default function MedicalDevicesPage() {
   }, [searchTerm, handleFilterChange]);
 
   // Filter effect
+  // useEffect(() => {
+  //   if (
+  //     medicalDeviceCategories.length > 0 &&
+  //     brands.length > 0 &&
+  //     models.length > 0
+  //   ) {
+  //     handleFilterChange();
+  //   }
+  // }, [selectedCategories, selectedBrands, selectedModels, filters]);
   useEffect(() => {
     if (
       medicalDeviceCategories.length > 0 &&
@@ -893,7 +906,16 @@ export default function MedicalDevicesPage() {
     ) {
       handleFilterChange();
     }
-  }, [selectedCategories, selectedBrands, selectedModels, filters]);
+  }, [
+    selectedCategories,
+    selectedBrands,
+    selectedModels,
+    filters,
+    handleFilterChange,
+    medicalDeviceCategories.length,
+    brands.length,
+    models.length,
+  ]);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -1104,7 +1126,7 @@ export default function MedicalDevicesPage() {
 
                 {searchTerm && (
                   <span className="bg-yellow-600/90 text-white px-3 py-1.5 rounded-full text-xs shadow-sm">
-                    Search: "{searchTerm}"
+                    Search: &quot;{searchTerm}&quot;
                   </span>
                 )}
               </div>

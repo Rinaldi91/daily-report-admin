@@ -143,40 +143,40 @@ export default function HealthFacilitiesClientPage() {
             label: c.city,
             value: c.city,
           }));
-        const fetchCities = async () => {
-          try {
-            const token = Cookies.get("token");
-            if (!token) throw new Error("Unauthorized");
+        // const fetchCities = async () => {
+        //   try {
+        //     const token = Cookies.get("token");
+        //     if (!token) throw new Error("Unauthorized");
 
-            const res = await fetch(
-              `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/city`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  Accept: "application/json",
-                },
-              }
-            );
+        //     const res = await fetch(
+        //       `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/city`,
+        //       {
+        //         headers: {
+        //           Authorization: `Bearer ${token}`,
+        //           Accept: "application/json",
+        //         },
+        //       }
+        //     );
 
-            if (!res.ok) throw new Error("Failed to fetch cities");
-            const json = await res.json();
+        //     if (!res.ok) throw new Error("Failed to fetch cities");
+        //     const json = await res.json();
 
-            if (json.data && Array.isArray(json.data)) {
-              const cityOptions: Option[] = json.data
-                .filter((c: { city: string }) => c.city && c.city !== "-")
-                .map((c: { city: string }) => ({
-                  label: c.city,
-                  value: c.city,
-                }))
-                .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
+        //     if (json.data && Array.isArray(json.data)) {
+        //       const cityOptions: Option[] = json.data
+        //         .filter((c: { city: string }) => c.city && c.city !== "-")
+        //         .map((c: { city: string }) => ({
+        //           label: c.city,
+        //           value: c.city,
+        //         }))
+        //         .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
 
-              setCities(cityOptions);
-            }
-          } catch (err) {
-            console.error("Error fetching cities:", err);
-            setCities([]);
-          }
-        };
+        //       setCities(cityOptions);
+        //     }
+        //   } catch (err) {
+        //     console.error("Error fetching cities:", err);
+        //     setCities([]);
+        //   }
+        // };
 
         setCities(cityOptions);
       }
@@ -185,6 +185,7 @@ export default function HealthFacilitiesClientPage() {
       setCities([]);
     }
   };
+
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -633,16 +634,16 @@ export default function HealthFacilitiesClientPage() {
     setSelectedItems(newSelected);
   };
 
-  const cityOptions: Option[] = Array.from(
-    new Set(healthFacilities.map((hf) => hf.city).filter(Boolean))
-  )
-    .map(
-      (city: string): Option => ({
-        label: city,
-        value: city, // ✅ string → cocok dengan Option['value']
-      })
-    )
-    .sort((a, b) => a.label.localeCompare(b.label));
+  // const cityOptions: Option[] = Array.from(
+  //   new Set(healthFacilities.map((hf) => hf.city).filter(Boolean))
+  // )
+  //   .map(
+  //     (city: string): Option => ({
+  //       label: city,
+  //       value: city, // ✅ string → cocok dengan Option['value']
+  //     })
+  //   )
+  //   .sort((a, b) => a.label.localeCompare(b.label));
 
   useEffect(() => {
     const initializeData = async () => {
