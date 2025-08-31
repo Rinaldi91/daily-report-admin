@@ -2,20 +2,21 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { FileText, LogOut, Search, ChevronLeft, Bell } from "lucide-react";
+import { FileText, LogOut, Search, ChevronLeft, Bell, RectangleVerticalIcon, CheckCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
-import { config } from "@fortawesome/fontawesome-svg-core";
-import "@fortawesome/fontawesome-svg-core/styles.css";
-config.autoAddCss = false;
+// import { config } from "@fortawesome/fontawesome-svg-core";
+// import "@fortawesome/fontawesome-svg-core/styles.css";
+// config.autoAddCss = false;
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faCheck,
-  faTriangleExclamation,
-} from "@fortawesome/free-solid-svg-icons";
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import {
+//   faCheck,
+//   faTriangleExclamation,
+// } from "@fortawesome/free-solid-svg-icons";
 import { renderToString } from "react-dom/server";
+import { Rectangle } from "react-leaflet";
 
 const MySwal = withReactContent(Swal);
 
@@ -386,7 +387,7 @@ export default function Header({
                       await MySwal.fire({
                         title: renderToString(
                           <span className="flex items-center text-center gap-2 text-red-500">
-                            <FontAwesomeIcon icon={faTriangleExclamation} />{" "}
+                            <RectangleVerticalIcon className="w-4 h-4" />
                             Service Alert
                           </span>
                         ),
@@ -494,7 +495,8 @@ export default function Header({
                         `,
                         confirmButtonText: (
                           <span className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faCheck} /> Oke
+                            <CheckCheck className="w-4 h-4" />
+                             Oke
                           </span>
                         ),
                         confirmButtonColor: "#ef4444",
