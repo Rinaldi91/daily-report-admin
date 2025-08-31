@@ -7,14 +7,14 @@ import { useState, useMemo } from "react";
 
 interface Option {
   label: string;
-  value: number;
+  value: string | number;
 }
 
 interface MultiSelectPopoverProps {
   options: Option[];
   selected: Option[];
   onChange: (selected: Option[]) => void;
-  placeholder?: string;
+  placeholder: string;
 }
 
 export default function MultiSelectPopover({
@@ -32,12 +32,15 @@ export default function MultiSelectPopover({
     );
   }, [options, search]);
 
-  const toggleOption = (option: Option) => {
+  const handleSelect = (option: Option) => {
     const isSelected = selected.some((s) => s.value === option.value);
     const newSelected = isSelected
       ? selected.filter((s) => s.value !== option.value)
       : [...selected, option];
     onChange(newSelected);
+
+    // ✅ Tutup popover setelah klik/pilih
+    setOpen(false);
   };
 
   return (
@@ -75,13 +78,14 @@ export default function MultiSelectPopover({
               <label
                 key={option.value}
                 className="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-700 cursor-pointer text-sm text-white"
+                onClick={() => handleSelect(option)} // ✅ langsung pilih & close
               >
                 {option.label}
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => toggleOption(option)}
-                  className="form-checkbox text-blue-600 w-4 h-4"
+                  readOnly
+                  className="form-checkbox text-blue-600 w-4 h-4 pointer-events-none"
                 />
               </label>
             );

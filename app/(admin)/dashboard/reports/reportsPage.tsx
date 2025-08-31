@@ -13,7 +13,6 @@ import {
   Clock,
   Hourglass,
   Download,
-  Filter,
   RotateCw,
   CalendarDays,
   CalendarRange,
@@ -36,6 +35,8 @@ import {
 import { useMemo } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { ChevronsUpDown, Check } from "lucide-react";
+import MultiSelectPopover from "@/components/ui/MultiSelectPopover";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface FullReport {
   id: number;
@@ -82,6 +83,32 @@ interface FullReport {
   };
 }
 
+interface EmployeeTeam {
+  id: number;
+  employee_id: number;
+  employee?: {
+    id: number;
+    name: string;
+    employee_number: string;
+  };
+}
+
+interface ReportWorkItem {
+  medical_device_id: number;
+  problem: string;
+  error_code: string;
+  job_action: string;
+  note: string;
+  job_order: string;
+  report_work_item_type: { type_of_work: { name: string } }[];
+  employee_team?: EmployeeTeam[]; // <- tambahkan ini
+}
+
+interface Option {
+  label: string;
+  value: string | number;
+}
+
 interface Employee {
   id: number;
   name: string;
@@ -102,6 +129,7 @@ interface Report {
   created_at: string;
   employee: Employee;
   health_facility: HealthFacility;
+  report_work_item?: ReportWorkItem[];
 }
 
 interface FlatReportData {
@@ -164,6 +192,32 @@ export default function ReportsClientPage() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [healthFacilities, setHealthFacilities] = useState<
+    { label: string; value: string }[]
+  >([]);
+  // const [selectedFacilities, setSelectedFacilities] = useState<
+  //   { label: string; value: string }[]
+  // >([]);
+  const [selectedFacilities, setSelectedFacilities] = useState<Option[]>([]);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const updateUrlParams = (
+    page: number,
+    search: string,
+    sDate: string,
+    eDate: string
+  ) => {
+    const params = new URLSearchParams();
+
+    params.set("page", page.toString());
+    if (search.trim()) params.set("search", search);
+    if (sDate) params.set("start_date", sDate);
+    if (eDate) params.set("end_date", eDate);
+
+    router.push(`?${params.toString()}`);
+  };
+
   const filteredEmployees = useMemo(() => {
     if (!searchQuery) {
       return employees;
@@ -200,8 +254,13 @@ export default function ReportsClientPage() {
         if (sDate) params.append("start_date", sDate);
         if (eDate) params.append("end_date", eDate);
 
+        // ✅ Update URL Browser
+        updateUrlParams(page, search, sDate, eDate);
+
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report?${params.toString()}`,
+          `${
+            process.env.NEXT_PUBLIC_BASE_URL_API
+          }/api/report?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -239,9 +298,9 @@ export default function ReportsClientPage() {
     fetchReports(1, searchTerm, today, today);
   };
 
-  const handleFilter = () => {
-    fetchReports(1, searchTerm, startDate, endDate);
-  };
+  // const handleFilter = () => {
+  //   fetchReports(1, searchTerm, startDate, endDate);
+  // };
 
   const handleReset = () => {
     setSearchTerm("");
@@ -273,6 +332,41 @@ export default function ReportsClientPage() {
       console.error("Error fetching employees:", err);
     }
   };
+
+  const fetchHealthFacilities = async () => {
+    try {
+      const token = Cookies.get("token");
+      if (!token) return;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility-name`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch health facilities");
+
+      const json = await res.json();
+      if (Array.isArray(json.data)) {
+        setHealthFacilities(
+          json.data.map((facility: { id: number; name: string }) => ({
+            label: facility.name,
+            value: facility.name, // kirim berdasarkan name sesuai filter backend
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching health facilities:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHealthFacilities();
+  }, []);
 
   // Fixed useEffect with proper dependencies
   useEffect(() => {
@@ -379,6 +473,20 @@ export default function ReportsClientPage() {
   };
 
   useEffect(() => {
+    const initialSearch = searchParams.get("search") || "";
+    const initialStartDate = searchParams.get("start_date") || "";
+    const initialEndDate = searchParams.get("end_date") || "";
+    const initialPage = parseInt(searchParams.get("page") || "1", 10);
+
+    setSearchTerm(initialSearch);
+    setStartDate(initialStartDate);
+    setEndDate(initialEndDate);
+    setCurrentPage(initialPage);
+
+    fetchReports(initialPage, initialSearch, initialStartDate, initialEndDate);
+  }, []);
+
+  useEffect(() => {
     const initializeData = async () => {
       const storedPermissions = Cookies.get("permissions");
       const storedRole = Cookies.get("role");
@@ -401,13 +509,13 @@ export default function ReportsClientPage() {
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when searching
+      setCurrentPage(1);
       fetchReports(1, searchTerm, startDate, endDate);
     }, 400);
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm, startDate, endDate, fetchReports]);
+  }, [searchTerm, startDate, endDate, selectedFacilities, fetchReports]);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -553,6 +661,27 @@ export default function ReportsClientPage() {
                         <div className="text-gray-400">
                           {report.employee?.employee_number || "-"}
                         </div>
+                        {/* {(
+                          report.report_work_item?.flatMap(
+                            (item) => item.employee_team ?? []
+                          ) ?? []
+                        ).length > 0 && (
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-400">Team:</span>
+                            <ul className="list-disc list-inside text-xs text-gray-300">
+                              {(
+                                report.report_work_item?.flatMap(
+                                  (item) => item.employee_team ?? []
+                                ) ?? []
+                              ).map((team, idx) => (
+                                <li key={team.id}>
+                                  {team.employee?.name ??
+                                    `Employee ID: ${team.employee_id}`}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )} */}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -653,7 +782,9 @@ export default function ReportsClientPage() {
       if (endDate) params.append("end_date", endDate);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report-all?${params.toString()}`,
+        `${
+          process.env.NEXT_PUBLIC_BASE_URL_API
+        }/api/report-all?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -780,7 +911,9 @@ export default function ReportsClientPage() {
       if (filterEndDate) params.append("end_date", filterEndDate);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/report-all?${params.toString()}`,
+        `${
+          process.env.NEXT_PUBLIC_BASE_URL_API
+        }/api/report-all?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1019,6 +1152,7 @@ export default function ReportsClientPage() {
             )}
           </div>
         </div> */}
+
         <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
             {/* Search Input (dibuat lebih lebar) */}
@@ -1038,6 +1172,25 @@ export default function ReportsClientPage() {
                 className="w-full pl-3 pr-10 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none bg-gray-900 text-white"
               />
             </div>
+            {/* <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Health Facility
+              </label>
+              <MultiSelectPopover
+                options={healthFacilities}
+                selected={selectedFacilities}
+                onChange={(selected: Option[]) =>
+                  setSelectedFacilities(
+                    selected.map((option) => ({
+                      label: option.label,
+                      value: option.value.toString(),
+                    }))
+                  )
+                }
+                placeholder="Select Health Facilities..."
+              />
+            </div> */}
+
             {/* Start Date */}
             <div className="md:col-span-1">
               <label
@@ -1072,13 +1225,13 @@ export default function ReportsClientPage() {
             </div>
             {/* Filter and Reset Buttons */}
             <div className="md:col-span-3 flex items-end gap-2">
-              <button
+              {/* <button
                 onClick={handleFilter}
                 className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
-              </button>
+              </button> */}
 
               {/* --- TOMBOL BARU: Filter Hari Ini --- */}
               <button

@@ -2,10 +2,20 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Cookies from "js-cookie";
-import { FileText, LogOut, Search, ChevronLeft } from "lucide-react";
+import { FileText, LogOut, Search, ChevronLeft, Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+config.autoAddCss = false;
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCheck,
+  faTriangleExclamation,
+} from "@fortawesome/free-solid-svg-icons";
+import { renderToString } from "react-dom/server";
 
 const MySwal = withReactContent(Swal);
 
@@ -26,6 +36,17 @@ interface MenuItem {
 interface HeaderProps {
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
+}
+
+interface DeviceNotification {
+  medical_device_id: number;
+  last_service: string;
+  days_since_service: number;
+  brand: string;
+  model: string;
+  serial_number: string;
+  health_facility: string;
+  employee_name: string;
 }
 
 // Menu items data (same as in Sidebar.tsx)
@@ -95,7 +116,37 @@ export default function Header({
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredMenus, setFilteredMenus] = useState<MenuItem[]>([]);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [notifications, setNotifications] = useState<DeviceNotification[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const token = Cookies.get("token");
+        if (!token) return;
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/notification-device`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        const data = await res.json();
+        if (data.status && Array.isArray(data.data)) {
+          setNotifications(data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch notifications", err);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   useEffect(() => {
     const stored = Cookies.get("user");
@@ -293,8 +344,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* Search Section */}
-
       {/* Right Side Icons */}
       <div className="flex items-center gap-2 ml-auto">
         {user && (
@@ -310,6 +359,189 @@ export default function Header({
             </div>
           </div>
         )}
+        {/* Notification Bell */}
+        <div className="relative">
+          <button
+            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            className="p-2 hover:bg-red-600 rounded-lg transition-colors relative cursor-pointer"
+            title="Notifications"
+          >
+            <Bell className="w-5 h-5 text-white hover:text-red-200" />
+            {notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-xs font-bold rounded-full px-1">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+
+          {/* Dropdown Notification */}
+          {isNotifOpen && (
+            <div className="absolute right-0 mt-2 w-96 bg-gray-800 text-gray-900 rounded-lg shadow-lg border border-gray-500 z-50 max-h-50 overflow-y-auto">
+              {notifications.length > 0 ? (
+                notifications.map((notif) => (
+                  <button
+                    key={notif.medical_device_id}
+                    onClick={async () => {
+                      setIsNotifOpen(false);
+                      await MySwal.fire({
+                        title: renderToString(
+                          <span className="flex items-center text-center gap-2 text-red-500">
+                            <FontAwesomeIcon icon={faTriangleExclamation} />{" "}
+                            Service Alert
+                          </span>
+                        ),
+                        html: `
+                          <div class="bg-gray-800 rounded-lg p-6 mt-4 border border-gray-700">
+                            <div class="grid gap-4">
+                              <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3 border-l-4 border-red-500">
+                                <div class="flex items-center">
+                                  <div class="bg-red-500 rounded-full p-2 mr-3">
+                                    <i class="fas fa-barcode text-white text-sm"></i>
+                                  </div>
+                                  <span class="text-gray-300 font-medium">Medical Device</span>
+                                </div>
+                                <span class="text-white font-mono font-bold">${
+                                  notif.brand
+                                } ${notif.model}</span>
+                              </div>
+                              
+                              <!-- Serial Number -->
+                              <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3 border-l-4 border-blue-500">
+                                <div class="flex items-center">
+                                  <div class="bg-blue-500 rounded-full p-2 mr-3">
+                                    <i class="fas fa-barcode text-white text-sm"></i>
+                                  </div>
+                                  <span class="text-gray-300 font-medium">Serial Number</span>
+                                </div>
+                                <span class="text-white font-mono font-bold">${
+                                  notif.serial_number
+                                }</span>
+                              </div>
+
+                              <!-- Health Facility -->
+                              <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3 border-l-4 border-green-500">
+                                <div class="flex items-center">
+                                  <div class="bg-green-500 rounded-full p-2 mr-3">
+                                    <i class="fas fa-hospital text-white text-sm"></i>
+                                  </div>
+                                  <span class="text-gray-300 font-medium">Health Facility</span>
+                                </div>
+                                <span class="text-white font-semibold">${
+                                  notif.health_facility
+                                }</span>
+                              </div>
+
+                              <!-- Last Service -->
+                              <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3 border-l-4 border-purple-500">
+                                <div class="flex items-center">
+                                  <div class="bg-purple-500 rounded-full p-2 mr-3">
+                                    <i class="fas fa-calendar-alt text-white text-sm"></i>
+                                  </div>
+                                  <span class="text-gray-300 font-medium">Last Service</span>
+                                </div>
+                                <span class="text-white font-semibold">${new Date(
+                                  notif.last_service
+                                ).toLocaleDateString("id-ID", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}</span>
+                              </div>
+
+                              
+
+                              <!-- Technician -->
+                              <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3 border-l-4 border-yellow-500">
+                                <div class="flex items-center">
+                                  <div class="bg-yellow-500 rounded-full p-2 mr-3">
+                                    <i class="fas fa-user-cog text-white text-sm"></i>
+                                  </div>
+                                  <span class="text-gray-300 font-medium">Technician</span>
+                                </div>
+                                <span class="text-white font-semibold">${
+                                  notif.employee_name
+                                }</span>
+                              </div>
+
+                              <!-- Days Since Service -->
+                              <div class="bg-gradient-to-r from-red-600 to-red-500 rounded-lg p-4 border border-red-400">
+                                <div class="flex items-center justify-center">
+                                  <div class="text-center">
+                                    <div class="text-3xl font-bold text-white">${
+                                      notif.days_since_service
+                                    }</div>
+                                    <div class="text-red-100 font-medium">Days since last service</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <!-- Action Recommendation -->
+                            <div class="mt-6 p-4 bg-yellow-900 bg-opacity-50 border border-yellow-600 rounded-lg">
+                              <div class="flex items-start">
+                                <i class="fas fa-lightbulb text-yellow-400 mt-1 mr-3"></i>
+                                <div>
+                                  <h4 class="text-yellow-300 font-semibold mb-2">Recommendation</h4>
+                                  <p class="text-yellow-100 text-sm">
+                                    This equipment requires immediate attention. Please coordinate with a technician to schedule maintenance.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        `,
+                        confirmButtonText: (
+                          <span className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faCheck} /> Oke
+                          </span>
+                        ),
+                        confirmButtonColor: "#ef4444",
+                        background: "#1f2937",
+                        color: "#f9fafb",
+                        width: "650",
+                        padding: "1em",
+                        customClass: {
+                          popup:
+                            "rounded-2xl shadow-2xl border border-gray-700",
+                          title: "mb-0",
+                          htmlContainer: "mb-4",
+                          confirmButton:
+                            "rounded-lg font-semibold px-6 py-3 hover:bg-red-600 transition-colors duration-200",
+                        },
+                        showClass: {
+                          popup:
+                            "animate__animated animate__fadeInUp animate__faster",
+                        },
+                        hideClass: {
+                          popup:
+                            "animate__animated animate__fadeOutDown animate__faster",
+                        },
+                      });
+
+                      // 🔹 setelah popup ditutup, auto close panel notifikasi
+                      setIsNotifOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 transition-colors border-b border-gray-300 last:border-b-0 cursor-pointer"
+                  >
+                    <div className="font-medium text-red-600">
+                      ⚠️ {notif.brand} {notif.model}
+                    </div>
+                    <div className="text-sm text-white">
+                      {notif.health_facility} — {notif.days_since_service} Days
+                      ago
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  No service notification
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <button
           onClick={handleLogout}

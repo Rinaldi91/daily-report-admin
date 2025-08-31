@@ -26,6 +26,7 @@ import {
   Waypoints,
   ChartNetwork,
   ClipboardPlus,
+  Info,
 } from "lucide-react";
 
 interface MenuItem {
@@ -93,12 +94,7 @@ const menuItems: MenuItem[] = [
         icon: MonitorCog,
         permissionChild: "view-medical-device-category",
       },
-      {
-        label: "Medical Devices ",
-        href: "/dashboard/medical-devices",
-        icon: MonitorSmartphone,
-        permissionChild: "view-medical-device",
-      },
+
       {
         label: "Type Of Facilities",
         href: "/dashboard/type-of-health-facilities",
@@ -131,12 +127,30 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
-   {
+  {
+    label: "Information",
+    href: "/dashboard/informations",
+    icon: Info,
+    permissionChild: "view-information",
+  },
+  {
     label: "Employee",
     href: "/dashboard/employees",
     icon: Users,
     permissionChild: "view-employee",
   },
+  {
+    label: "Medical Devices ",
+    href: "/dashboard/medical-devices",
+    icon: MonitorSmartphone,
+    permissionChild: "view-medical-device",
+  }, 
+  {
+    label: "LIS",
+    href: "/dashboard/laboratorium-information-system",
+    icon: MonitorCog,
+    permissionChild: "view-medical-device",
+  },   
   {
     label: "Health Facilities",
     href: "/dashboard/health-facilities",

@@ -17,6 +17,7 @@ import {
   PlusCircle,
   Eye,
   XCircle,
+  MonitorCog,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -64,10 +65,6 @@ interface ReportWorkItem {
   updated_at: string;
 }
 
-interface HealthFacility {
-  name: string;
-}
-
 interface MedicalDevice {
   id: number;
   medical_device_category_id: number;
@@ -81,7 +78,6 @@ interface MedicalDevice {
   updated_at: string;
   report_work_item: ReportWorkItem[];
   category_name?: string;
-  health_facilities: HealthFacility[];
 }
 
 interface FormMedicalDevice {
@@ -112,7 +108,7 @@ interface ModelItem {
   model: string;
 }
 
-export default function MedicalDevicesPage() {
+export default function LisPage() {
   const [devices, setDevices] = useState<MedicalDevice[]>([]);
   const router = useRouter();
   const [medicalDevices, setMedicalDevices] = useState<MedicalDevice[]>([]);
@@ -300,12 +296,9 @@ export default function MedicalDevicesPage() {
         }
 
         // Add multiselect brands
-        const excludedBrands = ["VANSLITE", "VANSLAB"];
         selectedBrands.forEach((brand) => {
           const brandValue = String(brand.value).toLowerCase();
-          if (!excludedBrands.includes(brandValue.toUpperCase())) {
-            allBrandFilters.add(brandValue);
-          }
+          allBrandFilters.add(brandValue);
         });
 
         // Append all unique brand filters
@@ -335,13 +328,13 @@ export default function MedicalDevicesPage() {
           "API URL:",
           `${
             process.env.NEXT_PUBLIC_BASE_URL_API
-          }/api/medical-device?${params.toString()}`
+          }/api/list-only-lis?${params.toString()}`
         );
 
         const res = await fetch(
           `${
             process.env.NEXT_PUBLIC_BASE_URL_API
-          }/api/medical-device?${params.toString()}`,
+          }/api/list-only-lis?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -369,7 +362,6 @@ export default function MedicalDevicesPage() {
               updated_at: d.updated_at || "",
               report_work_item: d.report_work_item || [],
               category_name: d.category_name || "",
-              health_facilities: d.health_facilities || [],
             }))
           : [];
 
@@ -659,7 +651,7 @@ export default function MedicalDevicesPage() {
   };
 
   const handleShow = (device: MedicalDevice) => {
-    router.push(`/dashboard/medical-devices/${device.id}`);
+    router.push(`/dashboard/laboratorium-information-system/${device.id}`);
   };
 
   const handleSubmit = async () => {
@@ -956,11 +948,11 @@ export default function MedicalDevicesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-white">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <MonitorSmartphone className="w-6 h-6" /> Medical Devices
+              <MonitorCog className="w-6 h-6" /> Laboratorium Information System
               Management
             </h1>
             <p className="mt-1 text-sm text-gray-400">
-              Manage medical devices and their information
+              Manage Laboratorium Information System
             </p>
           </div>
 
@@ -985,7 +977,7 @@ export default function MedicalDevicesPage() {
                 onClick={handleAdd}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                <Plus className="w-4 h-4 mr-2" /> Add Medical Device
+                <Plus className="w-4 h-4 mr-2" /> Add LIS
               </button>
             )}
           </div>
@@ -994,21 +986,19 @@ export default function MedicalDevicesPage() {
         {/* Enhanced Search and Filter Section */}
         <div className="bg-gray-900 p-6 rounded-lg border border-gray-700">
           {/* Search Input */}
-          <div className="mb-4">
-            <div className="relative">
+          <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search medical devices by serial number.."
+                placeholder="Search by serial number.."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-gray-800 text-white"
               />
             </div>
-          </div>
 
           {/* Filter Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Categories
@@ -1044,7 +1034,7 @@ export default function MedicalDevicesPage() {
                 placeholder="Select models..."
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Clear Filters Button */}
         </div>
@@ -1149,11 +1139,11 @@ export default function MedicalDevicesPage() {
         {/* Table */}
         <div className="bg-gray-900 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full table-auto border-collapse">
+            <table className="w-full">
               <thead className="bg-gray-800 text-white">
                 <tr>
                   {hasPermission("delete-medical-device") && (
-                    <th className="px-6 py-3 text-left  text-xs font-medium uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                       <input
                         type="checkbox"
                         checked={
@@ -1179,10 +1169,10 @@ export default function MedicalDevicesPage() {
                     Device Info
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                    Health Facility
+                    Category
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                    Category
+                    Serial Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                     Status
@@ -1200,7 +1190,7 @@ export default function MedicalDevicesPage() {
                   medicalDevices.map((device, index) => (
                     <tr key={device.id} className="hover:bg-gray-800">
                       {hasPermission("delete-medical-device") && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white text-center align-top">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={selectedDevices.has(device.id)}
@@ -1217,27 +1207,22 @@ export default function MedicalDevicesPage() {
                           <div className="text-white font-medium">
                             {device.brand || ""} {device.model || ""}
                           </div>
-                          <div className="text-gray-400 text-sm space-y-1">
-                            {/* <div>Brand : {device.brand || "-"}</div>
-                            <div>Model : {device.model || "N/A"}</div> */}
-                            <div>SN : {device.serial_number || "N/A"}</div>
+                          <div className="text-gray-400 text-sm">
+                            Brand : {device.brand || "-"} | Model :{" "}
+                            {device.model || "N/A"} | Software Version :{" "}
+                            {device.software_version || "N/A"}
                           </div>
                         </div>
                       </td>
-
-                      <td className="px-6 py-4 text-sm uppercase break-words max-w-xs">
-                        {device.health_facilities &&
-                        device.health_facilities.length > 0
-                          ? device.health_facilities
-                              .map((facility) => facility.name)
-                              .join(", ")
-                          : "N/A"}
-                      </td>
-
                       <td className="px-6 py-4 text-gray-300">
                         <span className="px-2 py-1 bg-blue-600 text-white rounded text-sm">
                           {getCategoryName(device.medical_device_category_id)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-300 text-sm">
+                        <code className="px-2 py-1 bg-gray-700 rounded text-xs">
+                          {device.serial_number || "-"}
+                        </code>
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -1248,7 +1233,7 @@ export default function MedicalDevicesPage() {
                           {device.status || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-400 text-sm whitespace-nowrap">
+                      <td className="px-6 py-4 text-gray-400 text-sm">
                         {formatDate(
                           getLastServiceDate(device.report_work_item)
                         )}

@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
       {
+        protocol: "http",
+        hostname: "report-api.test",
+        pathname: "/**",
+      },
+      {
         protocol: "https",
         hostname: "servicereport.fanscosa.co.id",
         pathname: "/**",

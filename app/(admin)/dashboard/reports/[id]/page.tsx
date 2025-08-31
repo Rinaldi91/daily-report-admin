@@ -699,7 +699,22 @@ export default function ReportDetailPage() {
               icon={<UserCheck className="text-blue-400 w-6 h-6" />}
               title="Technician"
             >
-              <InfoRow label="Name" value={report.employee?.name ?? "N/A"} />
+              <InfoRow
+                label="Name"
+                value={
+                  report.employee ? (
+                    <Link
+                      href={`/dashboard/employees/${report.employee.id}`}
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      {report.employee.name}
+                    </Link>
+                  ) : (
+                    "N/A"
+                  )
+                }
+              />
+
               <InfoRow
                 label="Employee ID"
                 value={report.employee?.employee_number ?? "N/A"}

@@ -35,6 +35,11 @@ interface MedicalDevice {
   status: string;
 }
 
+type Option = {
+  label: string;
+  value: string | number;
+};
+
 interface HealthFacility {
   medical_devices: MedicalDevice[] | boolean;
   id: number;
@@ -49,20 +54,6 @@ interface HealthFacility {
   updated_at: string;
   type: TypeOfHealthFacility;
 }
-
-// interface FacilityType {
-//   name: string | null;
-// }
-
-// interface Facility  {
-//   type?: FacilityType | null;
-//   name: string | null;
-//   email: string | null;
-//   phone_number: string | null;
-//   city: string | null;
-//   address: string | null;
-//   medical_devices?: MedicalDevice[] | null;
-// }
 
 interface ExcelRow {
   "Tipe Fasilitas": string;
@@ -93,236 +84,107 @@ export default function HealthFacilitiesClientPage() {
   const [totalHealthFacility, setTotalHealthFacility] = useState(0);
   const [perPage, setPerPage] = useState(10);
 
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get("search") || "";
+    }
+    return "";
+  });
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string>("");
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const [selectedTypeFilters, setSelectedTypeFilters] = useState<
-    { label: string; value: number }[]
-  >([]);
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<Option[]>(
+    () => {
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const typeIds = urlParams.getAll("type_ids[]");
+        // Ambil dari healthFacilityTypes jika perlu, atau simpan label via lookup
+        return typeIds
+          .map((id) => ({
+            label: `Loading...`, // sementara
+            value: parseInt(id, 10),
+          }))
+          .filter((item) => !isNaN(item.value));
+      }
+      return [];
+    }
+  );
+
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // const handleExport = async () => {
-  //   setIsExporting(true);
-  //   const token = Cookies.get("token");
+  const [cities, setCities] = useState<Option[]>([]);
 
-  //   if (!token) {
-  //     Swal.fire({
-  //       title: "Gagal",
-  //       text: "Token otentikasi tidak ditemukan. Silakan login kembali.",
-  //       icon: "error",
-  //       background: "#1e293b",
-  //       color: "#f8fafc",
-  //     });
-  //     setIsExporting(false);
-  //     return;
-  //   }
+  const fetchCities = async () => {
+    try {
+      const token = Cookies.get("token");
+      if (!token) throw new Error("Unauthorized");
 
-  //   // Menampilkan notifikasi loading
-  //   Swal.fire({
-  //     title: "Mengekspor Data",
-  //     text: "Mohon tunggu, kami sedang menyiapkan file Anda...",
-  //     allowOutsideClick: false,
-  //     background: "#1e293b",
-  //     color: "#f8fafc",
-  //     didOpen: () => {
-  //       Swal.showLoading();
-  //     },
-  //   });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/city`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
 
-  //   try {
-  //     // Langkah 1: Ambil SEMUA data fasilitas sesuai filter aktif
-  //     const typeIds = selectedTypeFilters.map((f) => f.value);
-  //     const params = new URLSearchParams();
-  //     params.append("per_page", "1000"); // Gunakan angka besar alih-alih "All"
+      if (!res.ok) throw new Error("Failed to fetch cities");
+      const json = await res.json();
 
-  //     // Tambahkan parameter search jika ada
-  //     if (searchTerm.trim()) {
-  //       params.append("search", searchTerm.trim());
-  //     }
+      if (json.data && Array.isArray(json.data)) {
+        const cityOptions: Option[] = json.data
+          .filter((c: { city: string }) => c.city && c.city !== "-")
+          .map((c: { city: string }) => ({
+            label: c.city,
+            value: c.city,
+          }));
+        const fetchCities = async () => {
+          try {
+            const token = Cookies.get("token");
+            if (!token) throw new Error("Unauthorized");
 
-  //     // Tambahkan filter type jika ada
-  //     if (typeIds.length > 0) {
-  //       typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
-  //     }
+            const res = await fetch(
+              `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/city`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/json",
+                },
+              }
+            );
 
-  //     console.log("Fetching export data with params:", params.toString());
+            if (!res.ok) throw new Error("Failed to fetch cities");
+            const json = await res.json();
 
-  //     const listRes = await fetch(
-  //       `https://servicereport.fanscosa.co.id/api/health-facility?${params.toString()}`,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           Accept: "application/json",
-  //           "Content-Type": "application/json",
-  //         },
-  //       }
-  //     );
+            if (json.data && Array.isArray(json.data)) {
+              const cityOptions: Option[] = json.data
+                .filter((c: { city: string }) => c.city && c.city !== "-")
+                .map((c: { city: string }) => ({
+                  label: c.city,
+                  value: c.city,
+                }))
+                .sort((a: Option, b: Option) => a.label.localeCompare(b.label));
 
-  //     console.log("List response status:", listRes.status);
+              setCities(cityOptions);
+            }
+          } catch (err) {
+            console.error("Error fetching cities:", err);
+            setCities([]);
+          }
+        };
 
-  //     if (!listRes.ok) {
-  //       const errorText = await listRes.text();
-  //       console.error("List API error:", errorText);
-  //       throw new Error(
-  //         `Gagal mengambil daftar fasilitas kesehatan untuk diekspor. Status: ${listRes.status}`
-  //       );
-  //     }
-
-  //     const listJson = await listRes.json();
-  //     console.log("List response data:", listJson);
-
-  //     // Periksa struktur response
-  //     let facilitiesToFetch: HealthFacility[] = [];
-  //     if (listJson.data && Array.isArray(listJson.data)) {
-  //       facilitiesToFetch = listJson.data;
-  //     } else if (Array.isArray(listJson)) {
-  //       facilitiesToFetch = listJson;
-  //     } else {
-  //       console.error("Unexpected response structure:", listJson);
-  //       throw new Error("Format response tidak sesuai yang diharapkan.");
-  //     }
-
-  //     if (facilitiesToFetch.length === 0) {
-  //       throw new Error(
-  //         "Tidak ada data yang tersedia untuk diekspor berdasarkan filter yang dipilih."
-  //       );
-  //     }
-
-  //     console.log(`Found ${facilitiesToFetch.length} facilities to export`);
-
-  //     // Langkah 2: Ambil data detail untuk setiap fasilitas untuk mendapatkan medical_devices
-  //     const detailPromises = facilitiesToFetch.map(async (facility) => {
-  //       try {
-  //         const detailRes = await fetch(
-  //           `https://servicereport.fanscosa.co.id/api/health-facility/${facility.slug}`,
-  //           {
-  //             headers: {
-  //               Authorization: `Bearer ${token}`,
-  //               Accept: "application/json",
-  //               "Content-Type": "application/json",
-  //             },
-  //           }
-  //         );
-
-  //         if (detailRes.ok) {
-  //           const detailJson = await detailRes.json();
-  //           return detailJson.data || detailJson;
-  //         } else {
-  //           console.error(`Failed to fetch detail for ${facility.slug}:`, detailRes.status);
-  //           // Return original facility if detail fetch fails
-  //           return facility;
-  //         }
-  //       } catch (error) {
-  //         console.error(`Error fetching detail for ${facility.slug}:`, error);
-  //         // Return original facility if detail fetch fails
-  //         return facility;
-  //       }
-  //     });
-
-  //     const detailResults = await Promise.all(detailPromises);
-  //     const facilitiesWithDetails: HealthFacility[] = detailResults.filter(
-  //       (facility) => facility !== null
-  //     );
-
-  //     console.log(`Got details for ${facilitiesWithDetails.length} facilities`);
-
-  //     // Langkah 3: Ratakan data (Flatten) untuk format Excel
-  //     const excelData: any[] = [];
-  //     facilitiesWithDetails.forEach((facility) => {
-  //       // Periksa apakah medical_devices ada dan berupa array
-  //       if (
-  //         facility.medical_devices &&
-  //         Array.isArray(facility.medical_devices) &&
-  //         facility.medical_devices.length > 0
-  //       ) {
-  //         // Jika ada medical devices, buat baris untuk setiap device
-  //         facility.medical_devices.forEach((device) => {
-  //           excelData.push({
-  //             "Nama Fasilitas": facility.name || "-",
-  //             "Tipe Fasilitas": facility.type?.name || "-",
-  //             Email: facility.email || "-",
-  //             "Nomor Telepon": facility.phone_number || "-",
-  //             Kota: facility.city || "-",
-  //             Alamat: facility.address || "-",
-  //             "Merek Perangkat": device.brand || "-",
-  //             "Model Perangkat": device.model || "-",
-  //             "Nomor Seri": device.serial_number || "-",
-  //             "Versi Software": device.software_version || "-",
-  //             "Status Perangkat": device.status || "-",
-  //           });
-  //         });
-  //       } else {
-  //         // Jika tidak ada medical devices, tetap tampilkan data fasilitas
-  //         excelData.push({
-  //           "Nama Fasilitas": facility.name || "-",
-  //           "Tipe Fasilitas": facility.type?.name || "-",
-  //           Email: facility.email || "-",
-  //           "Nomor Telepon": facility.phone_number || "-",
-  //           Kota: facility.city || "-",
-  //           Alamat: facility.address || "-",
-  //           "Merek Perangkat": "-",
-  //           "Model Perangkat": "-",
-  //           "Nomor Seri": "-",
-  //           "Versi Software": "-",
-  //           "Status Perangkat": "-",
-  //         });
-  //       }
-  //     });
-
-  //     if (excelData.length === 0) {
-  //       throw new Error("Tidak ada data yang dapat diekspor.");
-  //     }
-
-  //     console.log(`Prepared ${excelData.length} rows for Excel export`);
-
-  //     // Langkah 4: Buat dan unduh file Excel menggunakan library xlsx
-  //     const worksheet = XLSX.utils.json_to_sheet(excelData);
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "Fasilitas Kesehatan");
-
-  //     // Menyesuaikan lebar kolom secara otomatis
-  //     const columnWidths = Object.keys(excelData[0] || {}).map((key) => ({
-  //       wch: Math.max(key.length, 20), // Lebar minimal 20 karakter atau sepanjang judul
-  //     }));
-  //     worksheet["!cols"] = columnWidths;
-
-  //     // Generate filename with timestamp
-  //     const now = new Date();
-  //     const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
-  //     const filename = `Laporan_Fasilitas_Kesehatan_${timestamp}.xlsx`;
-
-  //     XLSX.writeFile(workbook, filename);
-
-  //     // Menampilkan notifikasi sukses
-  //     Swal.fire({
-  //       title: "Ekspor Berhasil!",
-  //       text: `Data untuk ${facilitiesWithDetails.length} fasilitas kesehatan dengan ${excelData.length} baris telah berhasil diekspor.`,
-  //       icon: "success",
-  //       background: "#1e293b",
-  //       color: "#f8fafc",
-  //     });
-  //   } catch (err) {
-  //     const errorMessage =
-  //       err instanceof Error
-  //         ? err.message
-  //         : "Terjadi kesalahan yang tidak terduga saat ekspor.";
-  //     console.error("Proses ekspor gagal:", err);
-  //     // Menampilkan notifikasi error
-  //     Swal.fire({
-  //       title: "Ekspor Gagal",
-  //       text: errorMessage,
-  //       icon: "error",
-  //       background: "#1e293b",
-  //       color: "#f8fafc",
-  //     });
-  //   } finally {
-  //     setIsExporting(false); // Menghentikan loading state
-  //   }
-  // };
+        setCities(cityOptions);
+      }
+    } catch (err) {
+      console.error("Error fetching cities:", err);
+      setCities([]);
+    }
+  };
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -340,7 +202,6 @@ export default function HealthFacilitiesClientPage() {
       return;
     }
 
-    // Menampilkan notifikasi loading
     Swal.fire({
       title: "Mengekspor Data",
       text: "Mohon tunggu, kami sedang menyiapkan file Anda...",
@@ -353,25 +214,32 @@ export default function HealthFacilitiesClientPage() {
     });
 
     try {
-      // Langkah 1: Ambil SEMUA data fasilitas sesuai filter aktif
+      // --- Ambil filter aktif ---
       const typeIds = selectedTypeFilters.map((f) => f.value);
-      const params = new URLSearchParams();
-      params.append("per_page", "1000"); // Gunakan angka besar alih-alih "All"
+      const cityValues = selectedCityFilters.map((c) => c.value);
 
-      // Tambahkan parameter search jika ada
+      const params = new URLSearchParams();
+      params.append("all_health_facilities", "true"); // ✅ ambil semua data
+
       if (searchTerm.trim()) {
         params.append("search", searchTerm.trim());
       }
-
-      // Tambahkan filter type jika ada
       if (typeIds.length > 0) {
         typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
       }
+      if (cityValues.length > 0) {
+        cityValues.forEach((city) =>
+          params.append("cities[]", city.toString())
+        );
+      }
 
-      console.log("Fetching export data with params:", params.toString());
+      console.log("Export params:", params.toString());
 
+      // --- Fetch semua data list sesuai filter ---
       const listRes = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility?${params.toString()}`,
+        `${
+          process.env.NEXT_PUBLIC_BASE_URL_API
+        }/api/health-facility?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -381,128 +249,62 @@ export default function HealthFacilitiesClientPage() {
         }
       );
 
-      console.log("List response status:", listRes.status);
-
       if (!listRes.ok) {
-        const errorText = await listRes.text();
-        console.error("List API error:", errorText);
         throw new Error(
-          `Gagal mengambil daftar fasilitas kesehatan untuk diekspor. Status: ${listRes.status}`
+          `Gagal mengambil daftar fasilitas kesehatan. Status: ${listRes.status}`
         );
       }
 
       const listJson = await listRes.json();
-      console.log("List response data:", listJson);
 
-      // Periksa struktur response
       let facilitiesToFetch: HealthFacility[] = [];
       if (listJson.data && Array.isArray(listJson.data)) {
         facilitiesToFetch = listJson.data;
       } else if (Array.isArray(listJson)) {
         facilitiesToFetch = listJson;
-      } else {
-        console.error("Unexpected response structure:", listJson);
-        throw new Error("Format response tidak sesuai yang diharapkan.");
       }
 
       if (facilitiesToFetch.length === 0) {
-        throw new Error(
-          "Tidak ada data yang tersedia untuk diekspor berdasarkan filter yang dipilih."
-        );
+        throw new Error("Tidak ada data yang tersedia untuk diekspor.");
       }
 
-      console.log(`Found ${facilitiesToFetch.length} facilities to export`);
-
-      // Langkah 2: Ambil data detail untuk setiap fasilitas untuk mendapatkan medical_devices
-      const detailPromises = facilitiesToFetch.map(async (facility) => {
-        try {
-          const detailRes = await fetch(
-            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${facility.slug}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/json",
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (detailRes.ok) {
-            const detailJson = await detailRes.json();
-            return detailJson.data || detailJson;
-          } else {
-            console.error(
-              `Failed to fetch detail for ${facility.slug}:`,
-              detailRes.status
+      // --- Ambil detail tiap fasilitas (medical_devices) ---
+      const detailResults = await Promise.all(
+        facilitiesToFetch.map(async (facility) => {
+          try {
+            const detailRes = await fetch(
+              `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${facility.slug}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/json",
+                },
+              }
             );
-            // Return original facility if detail fetch fails
+            if (detailRes.ok) {
+              const detailJson = await detailRes.json();
+              return detailJson.data || detailJson;
+            }
+            return facility;
+          } catch {
             return facility;
           }
-        } catch (error) {
-          console.error(`Error fetching detail for ${facility.slug}:`, error);
-          // Return original facility if detail fetch fails
-          return facility;
-        }
-      });
-
-      const detailResults = await Promise.all(detailPromises);
-      const facilitiesWithDetails: HealthFacility[] = detailResults.filter(
-        (facility) => facility !== null
+        })
       );
 
-      console.log(`Got details for ${facilitiesWithDetails.length} facilities`);
+      const facilitiesWithDetails = detailResults.filter(
+        Boolean
+      ) as HealthFacility[];
 
-      // Langkah 3: Ratakan data (Flatten) untuk format Excel - DIPERBAIKI
-      // const excelData: any[] = [];
-      // facilitiesWithDetails.forEach((facility) => {
-      //   // Periksa apakah medical_devices ada dan berupa array
-      //   if (
-      //     facility.medical_devices &&
-      //     Array.isArray(facility.medical_devices) &&
-      //     facility.medical_devices.length > 0
-      //   ) {
-      //     // Jika ada medical devices, buat baris untuk setiap device
-      //     facility.medical_devices.forEach((device, index) => {
-      //       excelData.push({
-      //         "Tipe Fasilitas": index === 0 ? (facility.type?.name || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Nama Fasilitas": index === 0 ? (facility.name || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Email": index === 0 ? (facility.email || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Nomor Telepon": index === 0 ? (facility.phone_number || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Kota": index === 0 ? (facility.city || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Alamat": index === 0 ? (facility.address || "-") : "", // Hanya tampilkan di baris pertama
-      //         "Merek Perangkat": device.brand || "-",
-      //         "Model Perangkat": device.model || "-",
-      //         "Nomor Seri": device.serial_number || "-",
-      //         "Versi Software": device.software_version || "-",
-      //         "Status Perangkat": device.status || "-",
-      //       });
-      //     });
-      //   } else {
-      //     // Jika tidak ada medical devices, tetap tampilkan data fasilitas
-      //     excelData.push({
-      //       "Tipe Fasilitas": facility.type?.name || "-",
-      //       "Nama Fasilitas": facility.name || "-",
-      //       "Email": facility.email || "-",
-      //       "Nomor Telepon": facility.phone_number || "-",
-      //       "Kota": facility.city || "-",
-      //       "Alamat": facility.address || "-",
-      //       "Merek Perangkat": "-",
-      //       "Model Perangkat": "-",
-      //       "Nomor Seri": "-",
-      //       "Versi Software": "-",
-      //       "Status Perangkat": "-",
-      //     });
-      //   }
-      // });
+      // --- Siapkan data Excel ---
       const excelData: ExcelRow[] = [];
+      facilitiesWithDetails.forEach((facility) => {
+        const devices = Array.isArray(facility.medical_devices)
+          ? facility.medical_devices
+          : [];
 
-      facilitiesWithDetails.forEach((facility: HealthFacility) => {
-        const hasDevices =
-          Array.isArray(facility.medical_devices) &&
-          facility.medical_devices.length > 0;
-
-        if (hasDevices) {
-          (facility.medical_devices as MedicalDevice[]).forEach((device, index) => {
+        if (devices.length > 0) {
+          devices.forEach((device, index) => {
             excelData.push({
               "Tipe Fasilitas": index === 0 ? facility.type?.name ?? "-" : "",
               "Nama Fasilitas": index === 0 ? facility.name ?? "-" : "",
@@ -538,53 +340,38 @@ export default function HealthFacilitiesClientPage() {
         throw new Error("Tidak ada data yang dapat diekspor.");
       }
 
-      console.log(`Prepared ${excelData.length} rows for Excel export`);
-
-      // Langkah 4: Buat dan unduh file Excel menggunakan library xlsx
+      // --- Generate file Excel ---
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Fasilitas Kesehatan");
 
-      // Menyesuaikan lebar kolom secara otomatis
-      const columnWidths = Object.keys(excelData[0] || {}).map((key) => ({
-        wch: Math.max(key.length, 20), // Lebar minimal 20 karakter atau sepanjang judul
+      worksheet["!cols"] = Object.keys(excelData[0]).map((key) => ({
+        wch: Math.max(key.length, 20),
       }));
-      worksheet["!cols"] = columnWidths;
 
-      // Tambahkan styling untuk merge cells (opsional - memerlukan library tambahan)
-      // Untuk saat ini, data sudah diformat dengan benar untuk Excel
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, "-");
+      XLSX.writeFile(workbook, `Laporan_Fasilitas_Kesehatan_${timestamp}.xlsx`);
 
-      // Generate filename with timestamp
-      const now = new Date();
-      const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-");
-      const filename = `Laporan_Fasilitas_Kesehatan_${timestamp}.xlsx`;
-
-      XLSX.writeFile(workbook, filename);
-
-      // Menampilkan notifikasi sukses
       Swal.fire({
         title: "Ekspor Berhasil!",
-        text: `Data untuk ${facilitiesWithDetails.length} fasilitas kesehatan dengan ${excelData.length} baris telah berhasil diekspor.`,
+        text: `Data ${facilitiesWithDetails.length} fasilitas berhasil diekspor.`,
         icon: "success",
         background: "#1e293b",
         color: "#f8fafc",
       });
     } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Terjadi kesalahan yang tidak terduga saat ekspor.";
-      console.error("Proses ekspor gagal:", err);
-      // Menampilkan notifikasi error
       Swal.fire({
         title: "Ekspor Gagal",
-        text: errorMessage,
+        text: err instanceof Error ? err.message : "Terjadi kesalahan.",
         icon: "error",
         background: "#1e293b",
         color: "#f8fafc",
       });
     } finally {
-      setIsExporting(false); // Menghentikan loading state
+      setIsExporting(false);
     }
   };
 
@@ -619,7 +406,12 @@ export default function HealthFacilitiesClientPage() {
   };
 
   const fetchHealthFacilities = useCallback(
-    async (page: number = 1, search: string = "", typeIds: number[] = []) => {
+    async (
+      page: number = 1,
+      search: string = "",
+      typeIds: number[] = [],
+      cities: string[] = []
+    ) => {
       setLoading(true);
       setError(null);
       try {
@@ -632,9 +424,14 @@ export default function HealthFacilitiesClientPage() {
         if (typeIds.length > 0) {
           typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
         }
+        if (cities.length > 0) {
+          cities.forEach((city) => params.append("cities[]", city.toString()));
+        }
 
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility?${params.toString()}`,
+          `${
+            process.env.NEXT_PUBLIC_BASE_URL_API
+          }/api/health-facility?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -706,7 +503,7 @@ export default function HealthFacilitiesClientPage() {
           });
           // Re-fetch data for the current page
           const typeIds = selectedTypeFilters.map((item) => item.value);
-          fetchHealthFacilities(currentPage, searchTerm, typeIds);
+          fetchHealthFacilities(currentPage, searchTerm, typeIds as number[]);
         } else {
           const errorData = await res.json();
           Swal.fire({
@@ -763,13 +560,16 @@ export default function HealthFacilitiesClientPage() {
         if (!token) throw new Error("Token not found");
 
         const deletePromises = Array.from(selectedItems).map((id) =>
-          fetch(`${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${id}`, {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          })
+          fetch(
+            `${process.env.NEXT_PUBLIC_BASE_URL_API}/api/health-facility/${id}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          )
         );
 
         const results = await Promise.allSettled(deletePromises);
@@ -811,7 +611,8 @@ export default function HealthFacilitiesClientPage() {
         fetchHealthFacilities(
           1,
           searchTerm,
-          selectedTypeFilters.map((f) => f.value)
+          selectedTypeFilters.map((f) => f.value as number),
+          selectedCityFilters.map((c) => c.value as string)
         );
       }
     }
@@ -832,6 +633,17 @@ export default function HealthFacilitiesClientPage() {
     setSelectedItems(newSelected);
   };
 
+  const cityOptions: Option[] = Array.from(
+    new Set(healthFacilities.map((hf) => hf.city).filter(Boolean))
+  )
+    .map(
+      (city: string): Option => ({
+        label: city,
+        value: city, // ✅ string → cocok dengan Option['value']
+      })
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   useEffect(() => {
     const initializeData = async () => {
       const storedPermissions = Cookies.get("permissions");
@@ -846,30 +658,95 @@ export default function HealthFacilitiesClientPage() {
       }
       if (storedRole) setUserRole(storedRole);
 
-      await Promise.all([fetchHealthFacilityTypes(), fetchHealthFacilities(1)]);
+      await Promise.all([
+        fetchHealthFacilityTypes(),
+        fetchHealthFacilities(1),
+        fetchCities(),
+      ]);
     };
     initializeData();
   }, [fetchHealthFacilities]);
 
+  const [selectedCityFilters, setSelectedCityFilters] = useState<Option[]>(
+    () => {
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const cities = urlParams.getAll("cities[]"); // 🔄 ganti dari "city"
+        return cities.map((city) => ({ label: city, value: city }));
+      }
+      return [];
+    }
+  );
+
+  useEffect(() => {
+    if (healthFacilityTypes.length > 0 && selectedTypeFilters.length > 0) {
+      const typeMap = new Map(healthFacilityTypes.map((t) => [t.id, t.name]));
+      const updated = selectedTypeFilters
+        .map((f) => ({
+          label: typeMap.get(f.value as number) || `Unknown Type (${f.value})`,
+          value: f.value,
+        }))
+        .filter((f) => typeof f.value === "number"); // pastikan value tetap number
+
+      if (updated.some((f, i) => f.label !== selectedTypeFilters[i]?.label)) {
+        setSelectedTypeFilters(updated);
+      }
+    }
+  }, [healthFacilityTypes, selectedTypeFilters]);
+
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
     searchTimeout.current = setTimeout(() => {
       const typeIds = selectedTypeFilters.map((item) => item.value);
-      fetchHealthFacilities(1, searchTerm, typeIds);
+      const cities = selectedCityFilters.map((item) => item.value);
+
+      const params = new URLSearchParams();
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (typeIds.length > 0) {
+        typeIds.forEach((id) => params.append("type_ids[]", id.toString()));
+      }
+      if (cities.length > 0) {
+        cities.forEach((city) => params.append("cities[]", city.toString()));
+      }
+
+      const newUrl = `/dashboard/health-facilities?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+
+      fetchHealthFacilities(
+        1,
+        searchTerm,
+        typeIds as number[],
+        cities as string[]
+      );
     }, 400);
+
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [searchTerm, selectedTypeFilters, fetchHealthFacilities]);
+  }, [
+    searchTerm,
+    selectedTypeFilters,
+    selectedCityFilters,
+    fetchHealthFacilities,
+  ]);
 
   const handlePageChange = useCallback(
     (page: number) => {
       if (page >= 1 && page <= totalPages) {
-        const typeIds = selectedTypeFilters.map((item) => item.value);
-        fetchHealthFacilities(page, searchTerm, typeIds);
+        const typeIds = selectedTypeFilters.map((item) => item.value as number);
+        const cities = selectedCityFilters.map((item) => item.value as string);
+
+        fetchHealthFacilities(page, searchTerm, typeIds, cities);
       }
     },
-    [searchTerm, totalPages, fetchHealthFacilities, selectedTypeFilters]
+    [
+      searchTerm,
+      totalPages,
+      fetchHealthFacilities,
+      selectedTypeFilters,
+      selectedCityFilters,
+    ]
   );
 
   const getPaginationNumbers = () => {
@@ -972,7 +849,7 @@ export default function HealthFacilitiesClientPage() {
                     Contact
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                    Location
+                    Address
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                     Actions
@@ -999,7 +876,7 @@ export default function HealthFacilitiesClientPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-white font-medium">
+                        <div className="text-white font-medium uppercase">
                           {facility.name}
                         </div>
                         <div className="text-gray-400 text-sm">
@@ -1183,14 +1060,27 @@ export default function HealthFacilitiesClientPage() {
                 value: type.id,
               }))}
               selected={selectedTypeFilters}
-              onChange={setSelectedTypeFilters}
+              onChange={setSelectedTypeFilters} // ✅ Sekarang OK: Option[] => Option[]
               placeholder="Filter by facility type"
             />
           </div>
-          {selectedTypeFilters.length > 0 && (
+
+          <div className="w-full md:w-1/2">
+            <MultiSelectPopover
+              options={cities}
+              selected={selectedCityFilters}
+              onChange={setSelectedCityFilters}
+              placeholder="Filter by city"
+            />
+          </div>
+
+          {(selectedTypeFilters.length > 0 ||
+            selectedCityFilters.length > 0 ||
+            searchTerm.trim() !== "") && (
             <button
               onClick={() => {
                 setSelectedTypeFilters([]);
+                setSelectedCityFilters([]);
                 setSearchTerm("");
               }}
               className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 hover:text-white transition cursor-pointer"
